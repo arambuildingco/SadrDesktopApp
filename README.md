@@ -7,7 +7,7 @@ WPF on .NET 10, SQL Server (LocalDB or full) via Entity Framework Core, QuestPDF
 ## Download (for testers)
 
 Grab the ready-to-run offline installer from the
-[**v1.4 release page**](https://github.com/skmodaresi/SadrApp/releases/download/v1.4/SadrApp-Setup-1.4.zip)
+[**v1.5 release page**](https://github.com/skmodaresi/SadrApp/releases/download/v1.5/SadrApp-Setup-1.5.zip)
 or browse all releases on the [Releases](https://github.com/skmodaresi/SadrApp/releases) page.
 
 The zip contains the full offline setup — .NET 10 runtime and SQL Server 2022 LocalDB installers
