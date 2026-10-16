@@ -5,7 +5,7 @@
         Title="تنظیمات اتصال به پایگاه داده" Height="560" Width="620"
         FlowDirection="RightToLeft"
         WindowStartupLocation="CenterOwner"
-        Background="#F3F5FA" ResizeMode="NoResize">
+        Background="{DynamicResource PageBgBrush}" ResizeMode="NoResize">
   <Grid Margin="16">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>

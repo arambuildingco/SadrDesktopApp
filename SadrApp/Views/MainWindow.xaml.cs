@@ -55,6 +55,7 @@ public partial class MainWindow : Window
         MnuWarehouseTransfers.Visibility = MnuWarehouseStockReport.Visibility = UserSession.CanManageWarehouse
             ? Visibility.Visible : Visibility.Collapsed;
         MnuConnection.Click += (_, _) => ShowConnectionSettings();
+        MnuAppSettings.Click += (_, _) => OpenTab(new SettingsPage(), "تنظیمات برنامه");
         MnuBackup.Click += (_, _) => new BackupWindow { Owner = this }.ShowDialog();
         MnuPrintSettings.Click += (_, _) => new SadrApp.Views.PrintSettingsWindow { Owner = this }.ShowDialog();
         MnuFontSettings.Click += (_, _) => new FontSettingsWindow { Owner = this }.ShowDialog();

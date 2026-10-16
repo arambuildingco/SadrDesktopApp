@@ -5,7 +5,7 @@
         Title="ویرایشگر" Height="640" Width="820" MinHeight="420" MinWidth="640"
         FlowDirection="RightToLeft"
         WindowStartupLocation="CenterOwner"
-        Background="#F3F5FA"
+        Background="{DynamicResource PageBgBrush}"
         ResizeMode="CanResize">
   <Grid Margin="16">
     <Grid.RowDefinitions>

@@ -5,9 +5,9 @@
         Title="سامانه حسابداری و مدیریت پروژه - صدر" Height="720" Width="1180"
         FlowDirection="RightToLeft"
         WindowStartupLocation="CenterScreen"
-        Background="#F3F5FA">
+        Background="{DynamicResource PageBgBrush}">
   <DockPanel>
-    <Border DockPanel.Dock="Top" Background="#1F3A5F" Padding="14,10">
+    <Border DockPanel.Dock="Top" Background="{DynamicResource PrimaryDarkBrush}" Padding="14,10">
       <DockPanel>
         <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
           <TextBlock Text="🏭" FontSize="20" Margin="0,0,8,0"/>
@@ -18,40 +18,37 @@
                    VerticalAlignment="Center" HorizontalAlignment="Left" Text="نسخه ۰.۱ — فاز ۱"/>
       </DockPanel>
     </Border>      <Menu DockPanel.Dock="Top" Background="White" FontSize="13" Padding="6,4" x:Name="MainMenu">
+      <!-- daily-use groups first: invoices → accounting → warehouse → master data → system -->
       <MenuItem Header="🧾 فاکتورها">
         <MenuItem Header="📄 پیش‌فاکتورها" x:Name="MnuPreInvoices"/>
         <MenuItem Header="🧾 فاکتورهای فروش" x:Name="MnuSellInvoices"/>
         <MenuItem Header="🛒 فاکتورهای خرید" x:Name="MnuBuyInvoices"/>
         <MenuItem Header="📋 همه فاکتورها" x:Name="MnuAllInvoices"/>
       </MenuItem>
-      <MenuItem Header="🏭 انبار">
-        <MenuItem Header="📦 حواله‌های انبار" x:Name="MnuWarehouseTransfers"/>
-        <MenuItem Header="📊 گزارش موجودی" x:Name="MnuWarehouseStockReport"/>
-      </MenuItem>
       <MenuItem Header="📊 حسابداری">
-        <MenuItem Header="🧩 گروه‌های حساب" x:Name="MnuAccountGroups"/>
         <MenuItem Header="💰 صندوق‌ها" x:Name="MnuCashes"/>
         <MenuItem Header="💵 تراکنش‌های مالی" x:Name="MnuMoneyTransactions"/>
         <MenuItem Header="📈 موجودی صندوق‌ها و بانک" x:Name="MnuBalancesDashboard"/>
+        <Separator/>
+        <MenuItem Header="🧩 گروه‌های حساب" x:Name="MnuAccountGroups"/>
         <MenuItem Header="📚 حساب‌های کل" x:Name="MnuGeneralAccounts"/>
         <MenuItem Header="📗 حساب‌های معین" x:Name="MnuSubSidiaryAccounts"/>
         <MenuItem Header="📄 حساب‌های تفصیلی" x:Name="MnuDetailAccounts"/>
       </MenuItem>
+      <MenuItem Header="🏭 انبار">
+        <MenuItem Header="📦 حواله‌های انبار" x:Name="MnuWarehouseTransfers"/>
+        <MenuItem Header="📊 گزارش موجودی" x:Name="MnuWarehouseStockReport"/>
+      </MenuItem>
       <MenuItem Header="💼 پرونده‌ها">
+        <MenuItem Header="👥 اشخاص" x:Name="MnuPeople"/>
+        <MenuItem Header="🏢 شرکت‌ها" x:Name="MnuCompanies"/>
+        <MenuItem Header="🤝 مشتریان و تأمین‌کنندگان" x:Name="MnuCustomersProviders"/>
+        <Separator/>
         <MenuItem Header="🗂 دسته‌بندی کالا" x:Name="MnuProductCategories"/>
         <MenuItem Header="📦 کالاها" x:Name="MnuProducts"/>
         <MenuItem Header="🏷 برندها" x:Name="MnuBrands"/>
         <MenuItem Header="📏 واحدهای شمارش" x:Name="MnuUnits"/>
         <MenuItem Header="🏷️ ویژگی‌های کالا" x:Name="MnuAttributes"/>
-        <Separator/>
-        <MenuItem Header="📁 دسته‌بندی پروژه" x:Name="MnuProjectCategories"/>
-        <MenuItem Header="📈 پروژه‌ها" x:Name="MnuProjects"/>
-        <MenuItem Header="📋 وظایف پروژه‌ها" x:Name="MnuTasks"/>
-        <Separator/>
-        <MenuItem Header="👥 اشخاص" x:Name="MnuPeople"/>
-        <MenuItem Header="🏢 شرکت‌ها" x:Name="MnuCompanies"/>
-        <MenuItem Header="🤝 مشتریان و تأمین‌کنندگان" x:Name="MnuCustomersProviders"/>
-        <MenuItem Header="👤 کاربران برنامه" x:Name="MnuUsers"/>
         <Separator/>
         <MenuItem Header="🏦 بانک‌ها" x:Name="MnuBanks"/>
         <MenuItem Header="🏛 شعب بانک‌ها" x:Name="MnuBankBranches"/>
@@ -59,12 +56,18 @@
         <MenuItem Header="📒 دفتر تراکنش‌های بانکی" x:Name="MnuBankTransactions"/>
         <MenuItem Header="🧾 مدیریت چک‌ها" x:Name="MnuCheques"/>
         <MenuItem Header="📅 سررسید چک‌ها" x:Name="MnuChequeDashboard"/>
+        <Separator/>
+        <MenuItem Header="📁 دسته‌بندی پروژه" x:Name="MnuProjectCategories"/>
+        <MenuItem Header="📈 پروژه‌ها" x:Name="MnuProjects"/>
+        <MenuItem Header="📋 وظایف پروژه‌ها" x:Name="MnuTasks"/>
         <MenuItem Header="🏬 انبارها" x:Name="MnuWarehouses"/>
         <Separator/>
         <MenuItem Header="💱 واحدهای پول" x:Name="MnuCurrencies"/>
         <MenuItem Header="🛡 نقش‌ها" x:Name="MnuRoles"/>
+        <MenuItem Header="👤 کاربران برنامه" x:Name="MnuUsers"/>
       </MenuItem>
       <MenuItem Header="⚙️ سیستم">
+        <MenuItem Header="⚙️ تنظیمات برنامه" x:Name="MnuAppSettings"/>
         <MenuItem Header="🔌 تنظیمات اتصال به پایگاه داده" x:Name="MnuConnection"/>
         <MenuItem Header="💾 پشتیبان‌گیری و بازیابی" x:Name="MnuBackup"/>
         <MenuItem Header="🖨 تنظیمات چاپ فاکتور" x:Name="MnuPrintSettings"/>
@@ -75,7 +78,7 @@
       </MenuItem>
     </Menu>
 
-    <Border DockPanel.Dock="Bottom" Background="#E8EDF6" Padding="12,6">
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource StatusBarBrush}" Padding="12,6">
       <DockPanel>
         <TextBlock x:Name="StatusText" DockPanel.Dock="Right" Foreground="#44506B" FontSize="12" Text="آماده"/>
         <TextBlock x:Name="ConnText" DockPanel.Dock="Left" Foreground="#8A94A8" FontSize="11" HorizontalAlignment="Left"/>

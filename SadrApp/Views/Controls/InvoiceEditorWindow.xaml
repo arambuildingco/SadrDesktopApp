@@ -6,7 +6,7 @@
         Title="فاکتور" Height="760" Width="1150" MinHeight="640" MinWidth="980"
         FlowDirection="RightToLeft"
         WindowStartupLocation="CenterOwner"
-        Background="#F3F5FA">
+        Background="{DynamicResource PageBgBrush}">
   <Grid Margin="14">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>

@@ -11,13 +11,18 @@
       <Style x:Key="H1" TargetType="TextBlock">
         <Setter Property="FontSize" Value="18"/>
         <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="Foreground" Value="#1F3A5F"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryDarkBrush}"/>
       </Style>
       <Style x:Key="H2" TargetType="TextBlock">
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="#1F3A5F"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryDarkBrush}"/>
         <Setter Property="Margin" Value="0,12,0,6"/>
+      </Style>
+      <Style x:Key="H3" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12.5"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="#44506B"/>
       </Style>
       <Style x:Key="FieldLabel" TargetType="TextBlock">
         <Setter Property="FontSize" Value="12"/>
@@ -43,7 +48,7 @@
         </Setter>
       </Style>
       <Style x:Key="PrimaryBtn" TargetType="Button">
-        <Setter Property="Background" Value="#2F6FED"/>
+        <Setter Property="Background" Value="{DynamicResource PrimaryBrush}"/>
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="Padding" Value="14,6"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -56,10 +61,10 @@
               </Border>
               <ControlTemplate.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                  <Setter Property="Background" Value="#2458C4"/>
+                  <Setter Property="Background" Value="{DynamicResource PrimaryHoverBrush}"/>
                 </Trigger>
                 <Trigger Property="IsEnabled" Value="False">
-                  <Setter Property="Background" Value="#A9BFEA"/>
+                  <Setter Property="Background" Value="{DynamicResource PrimaryDisabledBrush}"/>
                 </Trigger>
               </ControlTemplate.Triggers>
             </ControlTemplate>
@@ -68,9 +73,9 @@
       </Style>
       <Style x:Key="GhostBtn" TargetType="Button">
         <Setter Property="Background" Value="White"/>
-        <Setter Property="Foreground" Value="#2F6FED"/>
+        <Setter Property="Foreground" Value="{DynamicResource PrimaryBrush}"/>
         <Setter Property="Padding" Value="12,5"/>
-        <Setter Property="BorderBrush" Value="#C3D2F4"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GhostBorderBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
@@ -82,7 +87,7 @@
               </Border>
               <ControlTemplate.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                  <Setter Property="Background" Value="#EDF3FF"/>
+                  <Setter Property="Background" Value="{DynamicResource GhostHoverBrush}"/>
                 </Trigger>
               </ControlTemplate.Triggers>
             </ControlTemplate>

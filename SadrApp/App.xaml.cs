@@ -23,6 +23,9 @@ public partial class App : Application
 
         base.OnStartup(e);
 
+        // Program settings: apply the saved color schema (seller name/logo are read when printing).
+        AppSettingsService.LoadAndApply();
+
         // First-run: make sure a Connection.dat exists next to the exe.
         if (!DbConfig.Exists())
             DbConfig.Save(Database.ConnectionString);

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="تنظیمات فونت" Height="620" Width="560"
         FlowDirection="RightToLeft" WindowStartupLocation="CenterOwner"
-        Background="#F3F5FA" ResizeMode="NoResize">
+        Background="{DynamicResource PageBgBrush}" ResizeMode="NoResize">
   <Grid Margin="16">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
@@ -36,9 +36,9 @@
         </Grid.ColumnDefinitions>
 
         <!-- header row -->
-        <TextBlock Grid.Row="0" Grid.Column="0" Text="بخش" FontWeight="Bold" Foreground="#1F3A5F" Margin="0,0,6,6"/>
-        <TextBlock Grid.Row="0" Grid.Column="1" Text="قلم" FontWeight="Bold" Foreground="#1F3A5F" Margin="0,0,6,6"/>
-        <TextBlock Grid.Row="0" Grid.Column="2" Text="اندازه" FontWeight="Bold" Foreground="#1F3A5F" Margin="0,0,0,6"/>
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="بخش" FontWeight="Bold" Foreground="{DynamicResource PrimaryDarkBrush}" Margin="0,0,6,6"/>
+        <TextBlock Grid.Row="0" Grid.Column="1" Text="قلم" FontWeight="Bold" Foreground="{DynamicResource PrimaryDarkBrush}" Margin="0,0,6,6"/>
+        <TextBlock Grid.Row="0" Grid.Column="2" Text="اندازه" FontWeight="Bold" Foreground="{DynamicResource PrimaryDarkBrush}" Margin="0,0,0,6"/>
 
         <!-- apply-all row: one family+size copied to every scope -->
         <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Background="#EDF3FF" CornerRadius="6" Padding="8" Margin="0,0,0,8">
@@ -49,7 +49,7 @@
               <ColumnDefinition Width="80"/>
               <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="همهٔ بخش‌ها با هم" FontWeight="Bold" Foreground="#1F3A5F" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="0" Text="همهٔ بخش‌ها با هم" FontWeight="Bold" Foreground="{DynamicResource PrimaryDarkBrush}" VerticalAlignment="Center"/>
             <ComboBox Grid.Column="1" x:Name="CmbAllFamily" Style="{StaticResource Combo}" Margin="0,0,6,0"/>
             <TextBox Grid.Column="2" x:Name="NumAllSize" Style="{StaticResource Input}" Margin="0,0,6,0"/>
             <Button Grid.Column="3" Content="⬇️ اعمال به همه" x:Name="BtnApplyAll" Style="{StaticResource GhostBtn}"/>
@@ -81,7 +81,7 @@
         <Border Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3" Background="#F7F9FD"
                 BorderBrush="#D9E1EF" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,8,0,0">
           <StackPanel>
-            <TextBlock Text="پیش‌نمایش" FontWeight="Bold" Foreground="#1F3A5F" x:Name="PvForm"/>
+            <TextBlock Text="پیش‌نمایش" FontWeight="Bold" Foreground="{DynamicResource PrimaryDarkBrush}" x:Name="PvForm"/>
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
               <TextBlock Text="نام:" x:Name="PvLabel" VerticalAlignment="Center" Margin="0,0,6,0"/>
               <TextBox Text="نمونه ورودی" x:Name="PvInput" Width="160" Background="White"/>

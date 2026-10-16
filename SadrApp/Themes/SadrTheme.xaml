@@ -1,8 +1,19 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Themed brushes. Values below are the default "blue" palette; ThemeService
+    (Infrastructure/AppSettingsService.cs) replaces them at runtime when the user
+    picks another color schema in the settings page. All UI must reference these
+    keys via DynamicResource so a palette switch re-colors live.
+  -->
   <SolidColorBrush x:Key="PrimaryBrush" Color="#2F6FED"/>
   <SolidColorBrush x:Key="PrimaryDarkBrush" Color="#1F3A5F"/>
+  <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#2458C4"/>
+  <SolidColorBrush x:Key="PrimaryDisabledBrush" Color="#A9BFEA"/>
+  <SolidColorBrush x:Key="GhostBorderBrush" Color="#C3D2F4"/>
+  <SolidColorBrush x:Key="GhostHoverBrush" Color="#EDF3FF"/>
   <SolidColorBrush x:Key="PageBgBrush" Color="#F3F5FA"/>
+  <SolidColorBrush x:Key="StatusBarBrush" Color="#E8EDF6"/>
   <SolidColorBrush x:Key="CardBrush" Color="White"/>
   <SolidColorBrush x:Key="TextBrush" Color="#22314F"/>
   <SolidColorBrush x:Key="MutedBrush" Color="#8A94A8"/>

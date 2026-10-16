@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterScreen"
         WindowStyle="None" ResizeMode="NoResize"
         Background="Transparent" AllowsTransparency="True">
-  <Border CornerRadius="14" Background="#F3F5FA" BorderBrush="#D9E1EF" BorderThickness="1">
+  <Border CornerRadius="14" Background="{DynamicResource PageBgBrush}" BorderBrush="#D9E1EF" BorderThickness="1">
     <Border.Effect>
       <DropShadowEffect BlurRadius="24" ShadowDepth="2" Opacity="0.35" Direction="270"/>
     </Border.Effect>

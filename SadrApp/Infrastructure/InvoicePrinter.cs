@@ -50,6 +50,10 @@ public sealed class InvoicePrintModel
     public decimal TotalDiscount;
     public decimal TotalPrice;
 
+    // seller identity from the settings page (replaces «صدر» on printouts)
+    public string SellerName = "";
+    public byte[]? SellerLogo;
+
     public PrintOptions Opt = new();
 
     /// <summary>Printed title: the user override when set, otherwise the invoice-type label.</summary>
@@ -128,6 +132,13 @@ public static class InvoicePrinter
             TotalDiscount = inv.TotalDiscount,
             TotalPrice = inv.TotalPrice
         };
+
+        // seller identity from program settings; header falls back to it when no
+        // company record exists, and it replaces «صدر» in the default footer.
+        m.SellerName = AppSettingsService.Current.SellerName;
+        m.SellerLogo = AppSettingsService.ReadLogo();
+        if (m.CompanyName.Length == 0 && m.SellerName.Length > 0)
+            m.CompanyName = m.SellerName;
 
         if (inv.InvoiceType == InvoiceTypeConsts.Buy)
         {
@@ -239,7 +250,10 @@ public static class InvoicePrinter
                 page.Footer().Row(row =>
                 {
                     row.RelativeItem().Text(string.IsNullOrWhiteSpace(m.Opt.FooterNote)
-                            ? "صادر شده توسط نرم‌افزار صدر" : m.Opt.FooterNote!)
+                            ? (m.SellerName.Length > 0
+                                ? "صادر شده توسط " + m.SellerName
+                                : "صادر شده توسط نرم‌افزار صدر")
+                            : m.Opt.FooterNote!)
                         .FontSize(8.5f).FontColor("#8A94A8");
                     row.ConstantItem(150).Text(txt =>
                     {
@@ -255,11 +269,17 @@ public static class InvoicePrinter
 
     // ---------- layout: classic (official form) ----------
 
+    /// <summary>Logo to print: the print-setting logo when set, otherwise the settings-page logo.</summary>
+    private static byte[]? EffectiveLogo(InvoicePrintModel m) =>
+        m.Opt.Logo is { Length: > 0 } own ? own
+            : m.SellerLogo is { Length: > 0 } global ? global
+            : null;
+
     private static void ClassicHeader(InvoicePrintModel m, ColumnDescriptor col)
     {
         col.Item().Row(row =>
         {
-            if (m.Opt.Logo is { Length: > 0 } logo)
+            if (EffectiveLogo(m) is { } logo)
                 row.ConstantItem(120).PaddingBottom(4).Height(64).Image(logo);
             row.RelativeItem().Column(c =>
             {
@@ -333,7 +353,7 @@ public static class InvoicePrinter
     {
         col.Item().Border(1).BorderColor("#2F6FED").Background("#FFFFFF").Padding(12).Column(c =>
         {
-            if (m.Opt.Logo is { Length: > 0 } logo)
+            if (EffectiveLogo(m) is { } logo)
                 c.Item().MaxHeight(56).Image(logo);
             c.Item().Text(m.ResolvedTitle).Bold().FontFamily(TitleFont).FontSize(22).FontColor("#2F6FED").AlignCenter();
             if (m.CompanyName.Length > 0)
@@ -401,7 +421,7 @@ public static class InvoicePrinter
     {
         col.Item().Row(row =>
         {
-            if (m.Opt.Logo is { Length: > 0 } logo)
+            if (EffectiveLogo(m) is { } logo)
                 row.ConstantItem(90).Height(48).Image(logo);
             row.RelativeItem().Column(c =>
             {

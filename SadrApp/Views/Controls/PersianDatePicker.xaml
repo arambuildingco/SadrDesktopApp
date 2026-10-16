@@ -62,7 +62,7 @@
             <Button x:Name="BtnPrevYear"  Grid.Column="0" Content="«" Style="{StaticResource NavBtn}" Margin="0,0,4,0" ToolTip="سال قبل"/>
             <Button x:Name="BtnPrevMonth" Grid.Column="1" Content="‹" Style="{StaticResource NavBtn}" ToolTip="ماه قبل"/>
             <TextBlock x:Name="TitleText" Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center"
-                       FontWeight="Bold" FontSize="14" Foreground="#1F3A5F" Margin="6,0"/>
+                       FontWeight="Bold" FontSize="14" Foreground="{DynamicResource PrimaryDarkBrush}" Margin="6,0"/>
             <Button x:Name="BtnNextMonth" Grid.Column="3" Content="›" Style="{StaticResource NavBtn}" ToolTip="ماه بعد"/>
             <Button x:Name="BtnNextYear"  Grid.Column="4" Content="»" Style="{StaticResource NavBtn}" Margin="4,0,0,0" ToolTip="سال بعد"/>
           </Grid>

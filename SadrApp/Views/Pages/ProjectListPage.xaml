@@ -46,7 +46,7 @@
                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
                 <TextBlock Text="{Binding Code, StringFormat='  ({0})'}" Foreground="#8A94A8"/>
                 <TextBlock Text="{Binding Summary}" Foreground="#44506B" Margin="10,0,0,0"/>
-                <TextBlock Text="{Binding StatusText}" Foreground="#2F6FED" Margin="10,0,0,0" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding StatusText}" Foreground="{DynamicResource PrimaryBrush}" Margin="10,0,0,0" FontWeight="SemiBold"/>
               </StackPanel>
             </HierarchicalDataTemplate>
           </TreeView.Resources>

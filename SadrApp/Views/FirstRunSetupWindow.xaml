@@ -6,7 +6,7 @@
         FlowDirection="RightToLeft"
         WindowStartupLocation="CenterScreen"
         WindowStyle="ToolWindow" ResizeMode="NoResize"
-        Background="#F3F5FA">
+        Background="{DynamicResource PageBgBrush}">
   <StackPanel Margin="22">
     <TextBlock Text="🛠 راه‌اندازی اولیه سامانه" Style="{StaticResource H1}" Margin="0,0,0,6"/>
     <TextBlock Text="پایگاه داده ساخته شد. حالا کاربر مدیر اصلی را تعریف کنید تا وارد سامانه شوید."

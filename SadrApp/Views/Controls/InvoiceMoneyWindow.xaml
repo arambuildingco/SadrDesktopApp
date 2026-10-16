@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="تراکنش‌های مالی فاکتور" Height="480" Width="760"
         FlowDirection="RightToLeft" WindowStartupLocation="CenterOwner"
-        Background="#F3F5FA">
+        Background="{DynamicResource PageBgBrush}">
   <Grid Margin="12">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>

@@ -4,7 +4,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="ویرایش تنظیم چاپ" Height="520" Width="560"
         FlowDirection="RightToLeft" WindowStartupLocation="CenterOwner"
-        Background="#F3F5FA" ResizeMode="NoResize">
+        Background="{DynamicResource PageBgBrush}" ResizeMode="NoResize">
   <Grid Margin="16">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>

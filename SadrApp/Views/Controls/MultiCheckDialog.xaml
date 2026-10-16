@@ -5,7 +5,7 @@
         Title="انتخاب چندگانه" Height="480" Width="420"
         FlowDirection="RightToLeft"
         WindowStartupLocation="CenterOwner"
-        Background="#F3F5FA" ResizeMode="NoResize">
+        Background="{DynamicResource PageBgBrush}" ResizeMode="NoResize">
   <Grid Margin="14">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>
