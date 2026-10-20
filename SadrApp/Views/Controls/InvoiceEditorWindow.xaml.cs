@@ -34,6 +34,7 @@ public class InvoiceLineRow : INotifyPropertyChanged
     }
 
     private int _index;
+    private int _detailId;
     private int _productId;
     private string _productName = "";
     private int _unitId;
@@ -48,6 +49,9 @@ public class InvoiceLineRow : INotifyPropertyChanged
     private decimal? _discountAmount;
 
     public int Index { get => _index; set => Set(ref _index, value); }
+    /// <summary>Existing InvoiceDetail Id for loaded rows (0 on new rows) — drives line matching in SaveAsync,
+    /// so the same product may appear twice in one invoice.</summary>
+    public int DetailId { get => _detailId; set => Set(ref _detailId, value); }
     public int ProductId { get => _productId; set => Set(ref _productId, value); }
     public string ProductName { get => _productName; set => Set(ref _productName, value); }
     public int UnitId { get => _unitId; set => Set(ref _unitId, value); }
@@ -261,6 +265,7 @@ public partial class InvoiceEditorWindow : Window
                     var prod = _catalog.FirstOrDefault(c => c.Id == d.ProductId);
                     _rows.Add(new InvoiceLineRow
                     {
+                        DetailId = d.Id,
                         ProductId = d.ProductId,
                         ProductName = prod?.Name ?? ("کالای #" + d.ProductId),
                         UnitId = d.UnitId,
@@ -294,53 +299,53 @@ public partial class InvoiceEditorWindow : Window
     private void AddPlaceholderRow()
     {
         if (_rows.Count > 0) return;
-        var first = _catalog.FirstOrDefault();
-        _rows.Add(new InvoiceLineRow
-        {
-            ProductId = first?.Id ?? 0,
-            ProductName = first?.Name ?? "",
-            UnitId = first?.MainUnitId ?? 0,
-            UnitName = first?.UnitName ?? "",
-            Amount = 1,
-            UnitPrice = first?.Price,
-            CurrencyId = first?.CurrencyId,
-            CurrencyName = first?.CurrencyName ?? "",
-            PriceId = first?.PriceId,
-            DiscountPercent = first is { DiscountPercent: > 0 } ? first.DiscountPercent : null
-        });
+        // New invoice starts with an EMPTY row — no default product is imposed.
+        // The seller picks one by double-clicking the کالا column.
+        _rows.Add(new InvoiceLineRow { Amount = 1 });
         Renumber();
     }
 
     private void AddRow()
     {
+        // Reuse the first empty row (the placeholder or a cancelled pick) instead of adding row 2.
+        var target = _rows.FirstOrDefault(r => r.ProductId == 0);
+        bool appended = false;
+        if (target is null)
+        {
+            target = new InvoiceLineRow { Amount = 1 };
+            _rows.Add(target);
+            appended = true;
+        }
+        PickProductIntoRow(target);
+        if (target.ProductId == 0 && appended)
+        {
+            // picker cancelled on a fresh row — don't leave a stray empty row behind
+            _rows.Remove(target);
+            Renumber();
+        }
+        RecomputeTotals();
+    }
+
+    /// <summary>Opens the product picker and fills the row with the chosen product.</summary>
+    private void PickProductIntoRow(InvoiceLineRow row)
+    {
         var picked = PickProduct();
         if (picked is null) return;
-        _rows.Add(new InvoiceLineRow
-        {
-            ProductId = picked.Id,
-            ProductName = picked.Name,
-            UnitId = picked.MainUnitId,
-            UnitName = picked.UnitName,
-            Amount = 1,
-            UnitPrice = picked.Price,
-            CurrencyId = picked.CurrencyId,
-            CurrencyName = picked.CurrencyName,
-            PriceId = picked.PriceId,
-            // Default discount from the product's Price row (۰ = no default).
-            DiscountPercent = picked.DiscountPercent > 0 ? picked.DiscountPercent : null
-        });
-        Renumber();
+        row.ProductId = picked.Id;
+        row.ProductName = picked.Name;
+        row.UnitId = picked.MainUnitId;
+        row.UnitName = picked.UnitName;
+        row.UnitPrice = picked.Price;
+        row.CurrencyId = picked.CurrencyId;
+        row.CurrencyName = picked.CurrencyName;
+        row.PriceId = picked.PriceId;
+        // Default discount from the product's Price row (۰ = no default).
+        row.DiscountPercent = picked.DiscountPercent > 0 ? picked.DiscountPercent : null;
         RecomputeTotals();
     }
 
     private PickedProduct? PickProduct()
     {
-        if (_catalog.Count == 0)
-        {
-            MessageBox.Show("هیچ کالایی تعریف نشده است. ابتدا از منوی پرونده‌ها کالا اضافه کنید.",
-                "اطلاع", MessageBoxButton.OK, MessageBoxImage.Information);
-            return null;
-        }
         var dlg = new Window
         {
             Title = "انتخاب کالا",
@@ -352,10 +357,19 @@ public partial class InvoiceEditorWindow : Window
             Background = System.Windows.Media.Brushes.White
         };
         var panel = new StackPanel { Margin = new Thickness(10) };
-        var search = new TextBox { Style = (Style)FindResource("Input") };
-        var list = new ListBox { Height = 400, Margin = new Thickness(0, 8, 0, 0), FontSize = 13 };
+        var search = new TextBox { Style = (Style)FindResource("Input"), ToolTip = "جستجوی کالا" };
+        var list = new ListBox { Height = 380, Margin = new Thickness(0, 8, 0, 0), FontSize = 13 };
+        var btnNew = new Button
+        {
+            Content = "➕ کالای جدید",
+            Style = (Style)FindResource("PrimaryBtn"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 8, 0, 0),
+            ToolTip = "تعریف کالای جدید بدون خروج از فرم فاکتور"
+        };
         panel.Children.Add(search);
         panel.Children.Add(list);
+        panel.Children.Add(btnNew);
         dlg.Content = panel;
 
         void Fill(string q)
@@ -371,6 +385,15 @@ public partial class InvoiceEditorWindow : Window
         search.TextChanged += (_, _) => Fill(search.Text.Trim());
 
         PickedProduct? result = null;
+        btnNew.Click += (_, _) =>
+        {
+            var created = CreateProductInline(dlg);
+            if (created is not null)
+            {
+                result = created;
+                dlg.Close();
+            }
+        };
         list.MouseDoubleClick += (_, _) =>
         {
             if (list.SelectedValue is int id)
@@ -389,6 +412,82 @@ public partial class InvoiceEditorWindow : Window
         };
         dlg.ShowDialog();
         return result;
+    }
+
+    /// <summary>Creates a product without leaving the invoice (used by the picker's «کالای جدید» button).
+    /// On success the new product is added to the catalog and returned, ready to fill a row.</summary>
+    private PickedProduct? CreateProductInline(Window dialogOwner)
+    {
+        try
+        {
+            using var db = SadrDb.New();
+            var catChoices = db.ProductCategories.Where(c => !c.Deleted)
+                .Select(c => new KeyValuePair<int, string>(c.Id, c.Name)).ToList();
+            var unitChoices = db.Units.Where(u => !u.Deleted)
+                .Select(u => new KeyValuePair<int, string>(u.Id, u.Name)).ToList();
+            var brandChoices = db.Brands.Where(b => !b.Deleted)
+                .Select(b => new KeyValuePair<int, string>(b.Id, b.Name)).ToList();
+
+            var ed = new FieldEditorWindow("کالای جدید", new[]
+            {
+                FieldSpec.Text_("نام کالا", null, true),
+                FieldSpec.Text_("کد کالا", null, true),
+                FieldSpec.Multi_("توضیحات"),
+                FieldSpec.Choice_("دسته اصلی", catChoices, null),
+                FieldSpec.Choice_("واحد اصلی", unitChoices, null),
+                FieldSpec.Choice_("برند", brandChoices, null, optional: true),
+                FieldSpec.Numeric_("موجودی اولیه"),
+            }) { Owner = dialogOwner };
+            if (ed.ShowDialog() != true) return null;
+
+            var name = ed.GetText(0)!.Trim();
+            var code = ed.GetText(1)!.Trim();
+            if (name.Length == 0 || code.Length == 0)
+            {
+                MessageBox.Show("نام و کد کالا الزامی است.", "ذخیره ممکن نیست",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return null;
+            }
+            if (db.Products.Any(x => !x.Deleted && x.Code == code))
+            {
+                MessageBox.Show(CodeRules.MsgCodeDuplicate, "ذخیره ممکن نیست",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return null;
+            }
+
+            var now = DateTime.Now;
+            var p = new Product
+            {
+                RecordUniqueId = Guid.NewGuid(),
+                CreateDateTime = now,
+                Name = name,
+                Code = code,
+                Description = ed.GetText(2) ?? "",
+                MainCategoryId = ed.GetChoice(3) ?? 0,
+                MainUnitId = ed.GetChoice(4) ?? 0,
+                BrandId = ed.GetChoice(5),
+                InitialQuantity = ed.GetNumber(6) ?? 0,
+                UpdateDateTime = now
+            };
+            db.Products.Add(p);
+            db.SaveChanges();
+
+            var picked = new PickedProduct
+            {
+                Id = p.Id,
+                Name = p.Name,
+                MainUnitId = p.MainUnitId,
+                UnitName = db.Units.Where(u => u.Id == p.MainUnitId).Select(u => u.Name).FirstOrDefault() ?? ""
+                // no price rows yet — price/currency stay empty until defined
+            };
+            _catalog.Add(picked);
+            return picked;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "خطا در ذخیره کالا", MessageBoxButton.OK, MessageBoxImage.Error);
+            return null;
+        }
     }
 
     private void RemoveRow()
@@ -412,7 +511,6 @@ public partial class InvoiceEditorWindow : Window
 
     private static readonly string[] NumericColumnHeaders = { "مقدار", "قیمت واحد", "اضافه ٪", "تخفیف ٪", "تخفیف مبلغ" };
 
-    /// <summary>Numeric columns get live thousands separators in their edit TextBox.</summary>
     private void Grid_PreparingCellForEdit(object? sender, DataGridPreparingCellForEditEventArgs e)
     {
         if (e.Column is DataGridTextColumn col && NumericColumnHeaders.Contains(col.Header.ToString())
@@ -424,11 +522,17 @@ public partial class InvoiceEditorWindow : Window
 
     private void Grid_BeginningEdit(object? sender, DataGridBeginningEditEventArgs e)
     {
-        if (e.Row.Item is InvoiceLineRow row &&
-            e.Column is DataGridTextColumn col &&
-            (col.Header.ToString() == "کالا" || col.Header.ToString() == "واحد" || col.Header.ToString() == "ارز"))
+        if (e.Row.Item is InvoiceLineRow row && e.Column is DataGridTextColumn col)
         {
-            e.Cancel = true; // these come from the product picker
+            var header = col.Header.ToString();
+            if (header == "کالا")
+            {
+                e.Cancel = true;
+                PickProductIntoRow(row); // product chosen via the picker dialog
+                return;
+            }
+            if (header == "واحد" || header == "ارز")
+                e.Cancel = true; // these come from the product picker
         }
     }
 
@@ -530,8 +634,10 @@ public partial class InvoiceEditorWindow : Window
             if (_invoiceId is int id)
             {
                 inv = await db.Invoices.Include(i => i.Details).FirstAsync(i => i.Id == id);
-                // soft-delete removed lines
-                foreach (var d in inv.Details.Where(x => !x.Deleted && rows.All(r => r.ProductId != x.ProductId || false)))
+                // soft-delete removed lines — matched by line identity, not product id,
+                // so the same product can appear twice in one invoice
+                var keptDetailIds = rows.Where(r => r.DetailId > 0).Select(r => r.DetailId).ToHashSet();
+                foreach (var d in inv.Details.Where(x => !x.Deleted && !keptDetailIds.Contains(x.Id)))
                     d.Deleted = true;
             }
             else
@@ -552,11 +658,11 @@ public partial class InvoiceEditorWindow : Window
             inv.TotalPrice = rows.Sum(r => r.Total);
             inv.TotalDiscount = rows.Sum(r => r.DiscountRow);
 
-            // upsert lines (matching by product for edit mode)
+            // upsert lines (matched by loaded line identity; rows with DetailId 0 are new lines)
             foreach (var r in rows)
             {
-                var existing = _invoiceId is int
-                    ? inv.Details.FirstOrDefault(d => !d.Deleted && d.ProductId == r.ProductId)
+                var existing = _invoiceId is int && r.DetailId > 0
+                    ? inv.Details.FirstOrDefault(d => d.Id == r.DetailId)
                     : null;
                 if (existing is null)
                 {
@@ -579,6 +685,7 @@ public partial class InvoiceEditorWindow : Window
                 }
                 else
                 {
+                    existing.ProductId = r.ProductId;
                     existing.UnitPriceAmount = r.UnitPrice;
                     existing.CurrencyId = r.CurrencyId;
                     existing.UnitId = r.UnitId;

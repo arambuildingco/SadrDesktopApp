@@ -1,7 +1,9 @@
 using System.Collections;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using SadrApp.ViewModels;
 
 namespace SadrApp.Views.Controls;
@@ -52,31 +54,64 @@ public partial class ListTableControl : UserControl
 
     public void SetRows(IEnumerable rows)
     {
+        if (GetView() is ICollectionView old) old.CollectionChanged -= View_CollectionChanged;
         Grid.ItemsSource = rows;
+        AttachViewEvents();
         ApplyFilter();
     }
 
     public void RefreshRows()
     {
-        var view = Grid.ItemsSource as ICollectionView;
+        var view = GetView();
         view?.Refresh();
+    }
+
+    private ICollectionView? GetView() =>
+        Grid.ItemsSource is null ? null : CollectionViewSource.GetDefaultView(Grid.ItemsSource);
+
+    private void AttachViewEvents()
+    {
+        var view = GetView();
+        if (view is null) return;
+        view.CollectionChanged -= View_CollectionChanged; // never double-attached
+        view.CollectionChanged += View_CollectionChanged;
+    }
+
+    private void View_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        // A filter/reset re-numbers the rows so visible positions stay 1..N.
+        var view = sender as ICollectionView ?? GetView();
+        if (view is null) return;
+        Dispatcher.BeginInvoke(() => RenumberVisibleRows(view));
+    }
+
+    /// <summary>Renumbers RowNumber as a stable 1..N over the currently visible rows.</summary>
+    private void RenumberVisibleRows(ICollectionView view)
+    {
+        int i = 1;
+        foreach (var item in view)
+            if (item is RowBase row) row.RowNumber = i++;
     }
 
     private void ApplyFilter()
     {
-        if (Grid.ItemsSource is not ICollectionView view) return;
+        var view = GetView();
+        if (view is null) return;
         var q = SearchBox.Text?.Trim() ?? "";
         if (q.Length == 0)
         {
             view.Filter = null;
-            return;
         }
-        view.Filter = o =>
+        else
         {
-            var row = o as RowBase;
-            if (row is null) return false;
-            var hay = $"{row.Title} {row.Code} {row.Description} {row.Extra}";
-            return hay.Contains(q, StringComparison.OrdinalIgnoreCase);
-        };
+            view.Filter = o =>
+            {
+                var row = o as RowBase;
+                if (row is null) return false;
+                var hay = $"{row.Title} {row.Code} {row.Description} {row.Extra}";
+                return hay.Contains(q, StringComparison.OrdinalIgnoreCase);
+            };
+        }
+        RenumberVisibleRows(view);
     }
 }

@@ -61,7 +61,7 @@
       <StackPanel Orientation="Horizontal">
         <Button x:Name="BtnAddRow" Content="➕ افزودن کالا" Style="{StaticResource PrimaryBtn}"/>
         <Button x:Name="BtnRemoveRow" Content="🗑 حذف ردیف" Style="{StaticResource DangerBtn}" Margin="8,0,0,0"/>
-        <TextBlock x:Name="HintText" Text="روی ستون‌ها دوبار کلیک کنید تا مقدار وارد کنید" Foreground="#8A94A8"
+        <TextBlock x:Name="HintText" Text="برای انتخاب کالا روی ستون «کالا» دوبار کلیک کنید؛ برای مقادیر روی ستون‌های دیگر دوبار کلیک کنید" Foreground="#8A94A8"
                    FontSize="11" VerticalAlignment="Center" Margin="14,0,0,0"/>
         <TextBlock x:Name="ErrorText" Foreground="#D9534F" FontSize="12" VerticalAlignment="Center" Margin="14,0,0,0"/>
       </StackPanel>
@@ -74,7 +74,7 @@
                 BeginningEdit="Grid_BeginningEdit" CellEditEnding="Grid_CellEditEnding">
         <DataGrid.Columns>
           <DataGridTextColumn Header="#" Binding="{Binding Index}" IsReadOnly="True" Width="42"/>
-          <DataGridTextColumn Header="کالا" Binding="{Binding ProductName}" IsReadOnly="True" Width="2*"/>
+          <DataGridTextColumn Header="کالا" Binding="{Binding ProductName}" Width="2*"/>
           <DataGridTextColumn Header="واحد" Binding="{Binding UnitName}" IsReadOnly="True" Width="90"/>
           <DataGridTextColumn Header="مقدار" Binding="{Binding AmountText}" Width="90"/>
           <DataGridTextColumn Header="قیمت واحد" Binding="{Binding PriceText}" Width="110"/>

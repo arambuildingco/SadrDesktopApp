@@ -38,7 +38,7 @@
                 FontSize="13"
                 EnableRowVirtualization="True">
         <DataGrid.Columns>
-          <DataGridTextColumn Header="#" Binding="{Binding Id}" Width="60"/>
+          <DataGridTextColumn Header="#" Binding="{Binding RowNumber}" Width="60"/>
           <DataGridTextColumn Header="عنوان" Binding="{Binding Title}" Width="*"/>
           <DataGridTextColumn Header="کد" Binding="{Binding Code}" Width="110"/>
           <DataGridTextColumn x:Name="ExtraColumn" Header="توضیحات اضافی" Binding="{Binding Extra}" Width="180" Visibility="Collapsed"/>
