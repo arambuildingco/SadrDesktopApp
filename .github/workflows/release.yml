@@ -58,11 +58,33 @@ jobs:
 
       # Split out of the publish step: whichever of these turns red tells us whether
       # the failure is NuGet restore, compile/publish, or just zipping the output.
-      - name: Restore packages (diagnostic preflight)
+      # Restore is retried (the runner may hit nuget.org throttling) and, on failure,
+      # its first error line is copied into the NEXT step's name — step names are
+      # readable on the public run page, while log text needs a signed-in session.
+      - name: Restore packages
+        id: restore
         shell: pwsh
         run: |
-          dotnet restore SadrApp/SadrApp.csproj -r win-x64 --verbosity minimal
-          if ($LASTEXITCODE -ne 0) { throw 'dotnet restore failed' }
+          $code = 1
+          for ($i = 1; $i -le 3; $i++) {
+            $out = & dotnet restore SadrApp/SadrApp.csproj -r win-x64 --verbosity minimal 2>&1 | Out-String
+            $code = $LASTEXITCODE
+            $out | Write-Host
+            if ($code -eq 0) { break }
+            if ($i -lt 3) { Write-Host "restore attempt $i failed (exit $code) - retrying in 20s"; Start-Sleep -Seconds 20 }
+          }
+          $lines = $out -split "`r?`n"
+          $err = $lines | Where-Object { $_ -match '(?i)\berror\b' } | Select-Object -First 1
+          if (-not $err) { $err = $lines | Where-Object { $_.Trim() -ne '' } | Select-Object -Last 1 }
+          $err = "$err".Trim() -replace '[^A-Za-z0-9 .,:/()_+#=-]', '?'
+          if ($err.Length -gt 110) { $err = $err.Substring(0, 110) }
+          "detail=$err" >> $env:GITHUB_OUTPUT
+          if ($code -ne 0) { exit $code }
+
+      - name: "Restore reported: ${{ steps.restore.outputs.detail }}"
+        if: always() && steps.restore.outcome == 'failure'
+        shell: pwsh
+        run: Write-Host 'restore failed - first error line is shown in the step name above'
 
       - name: Publish the app (win-x64, framework-dependent)
         shell: pwsh
