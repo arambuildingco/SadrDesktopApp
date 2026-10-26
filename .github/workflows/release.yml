@@ -41,12 +41,40 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      # The SDK version is echoed into the step name so it is visible on the public
+      # run page without opening the (sign-in protected) log.
+      - name: Probe the runner SDK
+        id: sdk
+        shell: pwsh
+        run: |
+          $sdks = @(dotnet --list-sdks)
+          $v = if ($sdks.Count -gt 0) { ($sdks[-1] -split '\s+')[0] } else { 'NONE' }
+          "v=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "installed SDKs: $sdks"
+
+      - name: SDK on runner = ${{ steps.sdk.outputs.v }}
+        shell: pwsh
+        run: dotnet --version
+
+      # Split out of the publish step: whichever of these turns red tells us whether
+      # the failure is NuGet restore, compile/publish, or just zipping the output.
+      - name: Restore packages (diagnostic preflight)
+        shell: pwsh
+        run: |
+          dotnet restore SadrApp/SadrApp.csproj -r win-x64 --verbosity minimal
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet restore failed' }
+
       - name: Publish the app (win-x64, framework-dependent)
         shell: pwsh
         run: |
           dotnet publish SadrApp/SadrApp.csproj -c Release -r win-x64 --self-contained false -o dist/app -p:PublishSingleFile=false
           if ($LASTEXITCODE -ne 0) { throw 'SadrApp publish failed' }
+
+      - name: Zip the app
+        shell: pwsh
+        run: |
           Compress-Archive -Path dist/app/* -DestinationPath dist/SadrApp-win-x64.zip -Force
+          Get-Item dist/SadrApp-win-x64.zip | Select-Object Name, Length | Format-List
 
       # The full offline package the testers use: re-publishes the app, builds the
       # net472 setup wizard and downloads the .NET runtime + LocalDB redists.
