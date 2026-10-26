@@ -59,6 +59,40 @@ public class WarehouseTransfer
 }
 
 /// <summary>
+/// A product may only be added while a warehouse exists — stock always lives in a warehouse.
+/// When the WareHouses table is empty (fresh database, or every warehouse was deleted), the
+/// default warehouse is created automatically instead of blocking the product form.
+/// </summary>
+public static class DefaultWarehouse
+{
+    /// <summary>Name of the automatically created warehouse.</summary>
+    public const string Name = "انبار پیشفرش";
+
+    /// <summary>
+    /// Id of the first live warehouse, creating the default one when none exists.
+    /// Safe to call on every new-product save (no-op once a warehouse exists).
+    /// </summary>
+    public static async Task<int> EnsureAsync(SadrDbContext db)
+    {
+        var existing = await db.WareHouses.AsNoTracking()
+            .Where(w => !w.Deleted).OrderBy(w => w.Id).FirstOrDefaultAsync();
+        if (existing is not null) return existing.Id;
+
+        var wh = new WareHouse
+        {
+            Name = Name,
+            Description = "انبار پیش‌فرض — خودکار هنگام ثبت اولین کالا ساخته شد.",
+            Active = true,
+            RecordUniqueId = Guid.NewGuid(),
+            CreateDateTime = DateTime.Now
+        };
+        db.WareHouses.Add(wh);
+        await db.SaveChangesAsync();
+        return wh.Id;
+    }
+}
+
+/// <summary>
 /// Single source of truth for stock levels. Current stock of a product =
 /// InitialQuantity (opening value from the product form) plus signed, **accepted**
 /// transfers only — pending rows do not move stock until a warehouse keeper confirms

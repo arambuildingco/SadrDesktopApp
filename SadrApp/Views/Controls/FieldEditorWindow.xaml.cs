@@ -45,6 +45,11 @@ public class FieldSpec
     /// <summary>When set, renders a check box.</summary>
     public bool? CheckValue { get; set; }
 
+    /// <summary>When set, renders a "pick files" button (multi-select) for images/attachments.</summary>
+    public bool IsFiles { get; set; }
+    /// <summary>Full paths chosen so far in a files field (filled when the user picks files).</summary>
+    public List<string> FilePicks { get; set; } = new();
+
     /// <summary>Initial Gregorian value for date fields.</summary>
     public DateTime? DateValue { get; set; }
 
@@ -103,6 +108,10 @@ public class FieldSpec
 
     public static FieldSpec Date_(string label, DateTime? value = null, bool required = false) =>
         new() { Label = label, IsDate = true, DateValue = value, Required = required };
+
+    /// <summary>Multi-select file picker (one or more images); read the paths with GetFiles(index).</summary>
+    public static FieldSpec Files_(string label) =>
+        new() { Label = label, IsFiles = true, TextWidth = 420 };
 }
 
 public partial class FieldEditorWindow : Window
@@ -150,7 +159,7 @@ public partial class FieldEditorWindow : Window
         for (int i = 0; i < _specs.Count; i++)
         {
             var spec = _specs[i];
-            bool fullRow = spec.IsMultiLine || spec.MultiChoices is not null;
+            bool fullRow = spec.IsMultiLine || spec.MultiChoices is not null || spec.IsFiles;
 
             bool needNewRow = row < 0 || leftUsed || (fullRow && rightUsed);
             if (needNewRow) { row++; rightUsed = false; leftUsed = false; }
@@ -225,6 +234,52 @@ public partial class FieldEditorWindow : Window
                     && _inputs[mi] is ComboBox master)
                     master.SelectionChanged += (_, _) =>
                         FillMultiChoices(sp, spec, ChoicesForMaster(spec, master.SelectedValue as int?), keepChecked: true);
+            }
+            else if (spec.IsFiles)
+            {
+                // Multi-select image picker: a button plus how many files are already chosen.
+                var sp = new StackPanel { Orientation = Orientation.Horizontal };
+                var btn = new Button { Content = "📁 انتخاب تصاویر", Style = (Style)FindResource("GhostBtn") };
+                var info = new TextBlock
+                {
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(8, 0, 0, 0),
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x91, 0xA5))
+                };
+                var clear = new Button
+                {
+                    Content = "✕",
+                    Style = (Style)FindResource("GhostBtn"),
+                    Margin = new Thickness(6, 0, 0, 0),
+                    Padding = new Thickness(8, 2, 8, 2)
+                };
+
+                void Refresh()
+                {
+                    info.Text = spec.FilePicks.Count == 0
+                        ? "تصویری انتخاب نشده است"
+                        : $"{spec.FilePicks.Count} تصویر انتخاب شده";
+                    clear.Visibility = spec.FilePicks.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+                }
+
+                btn.Click += (_, _) =>
+                {
+                    var dlg = new Microsoft.Win32.OpenFileDialog
+                    {
+                        Multiselect = true,
+                        Filter = AppFiles.ImageFilter
+                    };
+                    if (dlg.ShowDialog() != true) return;
+                    spec.FilePicks.AddRange(dlg.FileNames);
+                    Refresh();
+                };
+                clear.Click += (_, _) => { spec.FilePicks.Clear(); Refresh(); };
+
+                Refresh();
+                sp.Children.Add(btn);
+                sp.Children.Add(info);
+                sp.Children.Add(clear);
+                input = sp;
             }
             else if (spec.Choices is not null)
             {
@@ -391,6 +446,9 @@ public partial class FieldEditorWindow : Window
 
     /// <summary>Gregorian value of a date field (null when empty).</summary>
     public DateTime? GetDate(int index) => _inputs[index] is PersianDatePicker p ? p.Value : null;
+
+    /// <summary>Full paths the user picked in a files field (empty when nothing was chosen).</summary>
+    public List<string> GetFiles(int index) => _specs[index].FilePicks;
 
     private static string? GetStringValue(FieldSpec spec, FrameworkElement input) =>
         input switch

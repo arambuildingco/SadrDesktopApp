@@ -186,6 +186,55 @@ public static class DbBootstrapper
                 );
                 """);
 
+            // Stored files: UploadedFiles (file registry) and ProductFiles (product ↔ image
+            // links). UploadedFiles may already exist on a live database with an older shape,
+            // so its columns are also added when missing; every ADD carries a default so
+            // existing rows stay valid.
+            SchemaHelpers.AddTableIfMissing(con, "UploadedFiles", """
+                CREATE TABLE [dbo].[UploadedFiles] (
+                    [Id] int NOT NULL IDENTITY,
+                    [FileName] nvarchar(max) NOT NULL,
+                    [OriginalName] nvarchar(max) NOT NULL,
+                    [Extension] nvarchar(max) NOT NULL,
+                    [FileSize] bigint NOT NULL,
+                    [Deleted] bit NOT NULL,
+                    [RecordUniqueId] uniqueidentifier NOT NULL,
+                    [CreateUserId] uniqueidentifier NULL,
+                    [UpdateUserId] uniqueidentifier NULL,
+                    [CreateDateTime] datetime2 NULL,
+                    [UpdateDateTime] datetime2 NULL,
+                    CONSTRAINT [PK_UploadedFiles] PRIMARY KEY ([Id])
+                );
+                """);
+            SchemaHelpers.AddColumnIfMissing(con, "UploadedFiles", "FileName", "nvarchar(400) NOT NULL DEFAULT(N'')");
+            SchemaHelpers.AddColumnIfMissing(con, "UploadedFiles", "OriginalName", "nvarchar(400) NOT NULL DEFAULT(N'')");
+            SchemaHelpers.AddColumnIfMissing(con, "UploadedFiles", "Extension", "nvarchar(20) NOT NULL DEFAULT(N'')");
+            SchemaHelpers.AddColumnIfMissing(con, "UploadedFiles", "FileSize", "bigint NOT NULL DEFAULT(0)");
+            SchemaHelpers.AddColumnIfMissing(con, "UploadedFiles", "Deleted", "bit NOT NULL DEFAULT(0)");
+            SchemaHelpers.AddColumnIfMissing(con, "UploadedFiles", "RecordUniqueId", "uniqueidentifier NOT NULL DEFAULT(NEWID())");
+            SchemaHelpers.AddColumnIfMissing(con, "UploadedFiles", "CreateUserId", "uniqueidentifier NULL");
+            SchemaHelpers.AddColumnIfMissing(con, "UploadedFiles", "UpdateUserId", "uniqueidentifier NULL");
+            SchemaHelpers.AddColumnIfMissing(con, "UploadedFiles", "CreateDateTime", "datetime2 NULL");
+            SchemaHelpers.AddColumnIfMissing(con, "UploadedFiles", "UpdateDateTime", "datetime2 NULL");
+            SchemaHelpers.AddTableIfMissing(con, "ProductFiles", """
+                CREATE TABLE [dbo].[ProductFiles] (
+                    [Id] int NOT NULL IDENTITY,
+                    [ProductId] int NOT NULL,
+                    [UploadedFileId] int NOT NULL,
+                    [Deleted] bit NOT NULL,
+                    [RecordUniqueId] uniqueidentifier NOT NULL,
+                    [CreateUserId] uniqueidentifier NULL,
+                    [UpdateUserId] uniqueidentifier NULL,
+                    [CreateDateTime] datetime2 NULL,
+                    [UpdateDateTime] datetime2 NULL,
+                    CONSTRAINT [PK_ProductFiles] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_ProductFiles_Products_ProductId] FOREIGN KEY ([ProductId]) REFERENCES [Products] ([Id]),
+                    CONSTRAINT [FK_ProductFiles_UploadedFiles_UploadedFileId] FOREIGN KEY ([UploadedFileId]) REFERENCES [UploadedFiles] ([Id])
+                );
+                CREATE INDEX [IX_ProductFiles_ProductId] ON [dbo].[ProductFiles] ([ProductId]);
+                CREATE INDEX [IX_ProductFiles_UploadedFileId] ON [dbo].[ProductFiles] ([UploadedFileId]);
+                """);
+
             // Helpful indexes on the pre-existing money tables (idempotent, no FK changes
             // on the live database).
             foreach (var (table, index, col) in new[]

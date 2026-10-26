@@ -157,6 +157,49 @@ public class ProductExtraCategory
     [ForeignKey(nameof(CategoryId))] public virtual ProductCategory? Category { get; set; }
 }
 
+/// <summary>
+/// One file stored by the application (currently product images). The bytes live in the
+/// UploadedFiles folder next to the executable; FileName is the unique stored name and
+/// OriginalName is the name the user picked. Rows are never hard-deleted — ProductFiles
+/// decides which product shows which file.
+/// </summary>
+[Table("UploadedFiles")]
+public class UploadedFile
+{
+    [Key] public int Id { get; set; }
+    /// <summary>File name inside the application's UploadedFiles folder (unique, app-generated).</summary>
+    public string FileName { get; set; } = "";
+    /// <summary>Original name chosen by the user, shown in the UI.</summary>
+    public string OriginalName { get; set; } = "";
+    /// <summary>Lower-case extension including the dot, e.g. ".png".</summary>
+    public string Extension { get; set; } = "";
+    public long FileSize { get; set; }
+    public bool Deleted { get; set; }
+    public Guid RecordUniqueId { get; set; }
+    public Guid? CreateUserId { get; set; }
+    public Guid? UpdateUserId { get; set; }
+    public DateTime? CreateDateTime { get; set; }
+    public DateTime? UpdateDateTime { get; set; }
+}
+
+/// <summary>Links a stored file to a product — one row per (product, image) selection.</summary>
+[Table("ProductFiles")]
+public class ProductFile
+{
+    [Key] public int Id { get; set; }
+    public int ProductId { get; set; }
+    public int UploadedFileId { get; set; }
+    public bool Deleted { get; set; }
+    public Guid RecordUniqueId { get; set; }
+    public Guid? CreateUserId { get; set; }
+    public Guid? UpdateUserId { get; set; }
+    public DateTime? CreateDateTime { get; set; }
+    public DateTime? UpdateDateTime { get; set; }
+
+    [ForeignKey(nameof(ProductId))] public virtual Product? Product { get; set; }
+    [ForeignKey(nameof(UploadedFileId))] public virtual UploadedFile? UploadedFile { get; set; }
+}
+
 // ===================== Projects =====================
 
 [Table("Projects")]

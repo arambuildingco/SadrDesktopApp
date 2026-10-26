@@ -21,6 +21,7 @@ public partial class ProductListPage : UserControl
         BtnExtraCats.Click += (_, _) => ManageExtraCategories();
         BtnAttribs.Click += (_, _) => ManageAttribs();
         BtnPrices.Click += (_, _) => ManagePrices();
+        BtnImages.Click += (_, _) => ManageImages();
         Loaded += (_, _) => Load();
     }
 
@@ -95,6 +96,11 @@ public partial class ProductListPage : UserControl
         try
         {
             await using var db = SadrDb.New();
+
+            // A product only makes sense with a warehouse behind it: make sure one exists
+            // before the new-product form opens (creates انبار پیشفرش when the table is empty).
+            if (id is null) await DefaultWarehouse.EnsureAsync(db);
+
             var catChoices = await db.ProductCategories.Where(c => !c.Deleted)
                 .Select(c => new KeyValuePair<int, string>(c.Id, c.Name)).ToListAsync();
             var unitChoices = await db.Units.Where(u => !u.Deleted)
@@ -112,7 +118,8 @@ public partial class ProductListPage : UserControl
                 FieldSpec.Choice_("دسته اصلی", catChoices, e?.MainCategoryId),
             FieldSpec.Choice_("واحد اصلی", unitChoices, e?.MainUnitId),
             FieldSpec.Choice_("برند", brandChoices, e?.BrandId, optional: true),
-            FieldSpec.Numeric_("موجودی اولیه", e?.InitialQuantity)
+            FieldSpec.Numeric_("موجودی اولیه", e?.InitialQuantity),
+            FieldSpec.Files_("تصاویر کالا")
         }) { Owner = Window.GetWindow(this) };
             if (dlg.ShowDialog() != true) return;
 
@@ -133,6 +140,25 @@ public partial class ProductListPage : UserControl
             e.InitialQuantity = dlg.GetNumber(6) ?? 0; // opening stock; current = this + accepted transfers
             e.UpdateDateTime = now;
             await db.SaveChangesAsync();
+
+            // Newly picked images: copied into the app's UploadedFiles folder, one
+            // UploadedFiles row each, plus a ProductFiles link row per image.
+            var picked = dlg.GetFiles(7);
+            if (picked.Count > 0)
+            {
+                try
+                {
+                    await AppFiles.AttachToProductAsync(db, e.Id, picked);
+                }
+                catch (Exception fx)
+                {
+                    // The product itself is already saved — a storage problem (e.g. a
+                    // read-only install folder) must not look like a failed save.
+                    MessageBox.Show("کالا ذخیره شد، اما افزودن تصویرها ناموفق بود:\n" + fx.Message,
+                        "خطا در ذخیره تصویر", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+
             Load();
         }
         catch (Exception ex)
@@ -172,6 +198,13 @@ public partial class ProductListPage : UserControl
         if (ListCtl.SelectedRow is not RowBase row) { Info("ابتدا یک کالا را انتخاب کنید."); return; }
         new ProductPricesDialog(row.Id, row.Title) { Owner = Window.GetWindow(this) }.ShowDialog();
         Load(); // last-price column may have changed
+    }
+
+    /// <summary>Opens the product's image gallery (add / remove one or more images).</summary>
+    private void ManageImages()
+    {
+        if (ListCtl.SelectedRow is not RowBase row) { Info("ابتدا یک کالا را انتخاب کنید."); return; }
+        new ProductImagesWindow(row.Id, row.Title) { Owner = Window.GetWindow(this) }.ShowDialog();
     }
 
     private async void ManageExtraCategories()

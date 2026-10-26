@@ -8,6 +8,8 @@ public class SadrDbContext : DbContext
 
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<ProductExtraCategory> ProductExtraCategories => Set<ProductExtraCategory>();
+    public DbSet<UploadedFile> UploadedFiles => Set<UploadedFile>();
+    public DbSet<ProductFile> ProductFiles => Set<ProductFile>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProjectCategory> ProjectCategories => Set<ProjectCategory>();
     public DbSet<Project> Projects => Set<Project>();
@@ -63,6 +65,12 @@ public class SadrDbContext : DbContext
           .WithMany(p => p.ExtraCategories).HasForeignKey(e => e.ProductId).OnDelete(DeleteBehavior.NoAction);
         mb.Entity<ProductExtraCategory>().HasOne(e => e.Category)
           .WithMany().HasForeignKey(e => e.CategoryId).OnDelete(DeleteBehavior.NoAction);
+
+        // Stored files: a product image is a ProductFiles row pointing at an UploadedFiles row.
+        mb.Entity<ProductFile>().HasOne(f => f.Product)
+          .WithMany().HasForeignKey(f => f.ProductId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<ProductFile>().HasOne(f => f.UploadedFile)
+          .WithMany().HasForeignKey(f => f.UploadedFileId).OnDelete(DeleteBehavior.NoAction);
 
         mb.Entity<Project>().HasOne(p => p.Category)
           .WithMany().HasForeignKey(p => p.CategoryId).OnDelete(DeleteBehavior.NoAction);
