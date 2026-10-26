@@ -58,33 +58,72 @@ jobs:
 
       # Split out of the publish step: whichever of these turns red tells us whether
       # the failure is NuGet restore, compile/publish, or just zipping the output.
-      # Restore is retried (the runner may hit nuget.org throttling) and, on failure,
-      # its first error line is copied into the NEXT step's name — step names are
-      # readable on the public run page, while log text needs a signed-in session.
+      # Restore fails silently (MSB4181 "returned false but did not log an error"), so
+      # the configured sources and the interesting output lines are copied into the
+      # following step names: step names are readable on the public run page, while
+      # log text needs a signed-in session. Values are stripped to a YAML-safe charset.
+      - name: List NuGet sources
+        id: srcs
+        shell: pwsh
+        run: |
+          $out = & dotnet nuget list source 2>&1 | Out-String
+          $out | Write-Host
+          $names = @($out -split "`r?`n" | Where-Object { $_ -match '^\s*\d+\.\s+' } |
+            ForEach-Object { ($_ -replace '^\s*\d+\.\s+', '').Trim() })
+          $list = ($names -join ' | ') -replace '[^A-Za-z0-9 .,:/()_+=@-]', '?'
+          if ($list.Length -gt 150) { $list = $list.Substring(0, 150) }
+          "list=$list" >> $env:GITHUB_OUTPUT
+
+      - name: "NuGet sources: ${{ steps.srcs.outputs.list }}"
+        shell: pwsh
+        run: Write-Host 'sources listed above'
+
       - name: Restore packages
         id: restore
         shell: pwsh
         run: |
-          $code = 1
-          for ($i = 1; $i -le 3; $i++) {
-            $out = & dotnet restore SadrApp/SadrApp.csproj -r win-x64 --verbosity minimal 2>&1 | Out-String
-            $code = $LASTEXITCODE
-            $out | Write-Host
-            if ($code -eq 0) { break }
-            if ($i -lt 3) { Write-Host "restore attempt $i failed (exit $code) - retrying in 20s"; Start-Sleep -Seconds 20 }
+          $out = & dotnet restore SadrApp/SadrApp.csproj -r win-x64 --verbosity minimal 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          $out | Write-Host
+          $lines = @($out -split "`r?`n" | Where-Object { $_.Trim() -ne '' })
+          function Clip($s) {
+            if ($null -eq $s) { return 'none' }
+            $s = "$s".Trim() -replace '[^A-Za-z0-9 .,:/()_+#=-]', '?'
+            if ($s.Length -gt 110) { $s = $s.Substring(0, 110) }
+            if (-not $s) { $s = 'none' }
+            return $s
           }
-          $lines = $out -split "`r?`n"
-          $err = $lines | Where-Object { $_ -match '(?i)\berror\b' } | Select-Object -First 1
-          if (-not $err) { $err = $lines | Where-Object { $_.Trim() -ne '' } | Select-Object -Last 1 }
-          $err = "$err".Trim() -replace '[^A-Za-z0-9 .,:/()_+#=-]', '?'
-          if ($err.Length -gt 110) { $err = $err.Substring(0, 110) }
-          "detail=$err" >> $env:GITHUB_OUTPUT
+          $net  = $lines | Where-Object { $_ -match '(?i)(status code|429|431|401|403|forbidden|denied|unable|timeout|timed out|socket|connection|quota)' } | Select-Object -First 1
+          $codeLine = $lines | Where-Object { $_ -match '(?i)\b(error|exception)\b' -and $_ -notmatch 'MSB4181' } | Select-Object -First 1
+          $o = $lines | Select-Object -First 1
+          $t = $lines | Select-Object -Last 1
+          $t2 = $lines | Select-Object -Last 2 | Select-Object -First 1
+          "first=$(Clip $o)" >> $env:GITHUB_OUTPUT
+          "net=$(Clip $net)" >> $env:GITHUB_OUTPUT
+          "codeline=$(Clip $codeLine)" >> $env:GITHUB_OUTPUT
+          "tail=$(Clip $t)" >> $env:GITHUB_OUTPUT
+          "tail2=$(Clip $t2)" >> $env:GITHUB_OUTPUT
           if ($code -ne 0) { exit $code }
 
-      - name: "Restore reported: ${{ steps.restore.outputs.detail }}"
+      - name: "Restore error line: ${{ steps.restore.outputs.codeline }}"
         if: always() && steps.restore.outcome == 'failure'
         shell: pwsh
-        run: Write-Host 'restore failed - first error line is shown in the step name above'
+        run: Write-Host 'see restore'
+
+      - name: "Restore network line: ${{ steps.restore.outputs.net }}"
+        if: always() && steps.restore.outcome == 'failure'
+        shell: pwsh
+        run: Write-Host 'see restore'
+
+      - name: "Restore first line: ${{ steps.restore.outputs.first }}"
+        if: always() && steps.restore.outcome == 'failure'
+        shell: pwsh
+        run: Write-Host 'see restore'
+
+      - name: "Restore last 2 lines: ${{ steps.restore.outputs.tail2 }} // ${{ steps.restore.outputs.tail }}"
+        if: always() && steps.restore.outcome == 'failure'
+        shell: pwsh
+        run: Write-Host 'see restore'
 
       - name: Publish the app (win-x64, framework-dependent)
         shell: pwsh
