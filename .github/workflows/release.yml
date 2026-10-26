@@ -1,15 +1,19 @@
 name: Release
 
-# Builds the Windows app and publishes it as a GitHub Release whenever a version
-# tag (v1.7, v1.8, …) is pushed. A manual run builds the same packages but only
-# stores them as workflow artifacts, so the pipeline can be tested without a tag.
+# Builds the Windows app and publishes it to GitHub Releases.
+#
+#   push a v* tag   -> versioned release (v1.7, …), kept forever
+#   push to main    -> the rolling "latest" release is replaced, so its assets
+#                      always match the newest commit on main
+#   manual run      -> publishes "latest" too, and stores the zips as artifacts
 #
 # Release assets:
-#   SadrApp-Setup-<tag>.zip  full offline installer (SadrSetup.exe + app + redists)
+#   SadrApp-Setup-<ver>.zip  full offline installer (SadrSetup.exe + app + redists)
 #   SadrApp-win-x64.zip      app binaries only (needs .NET 10 Desktop Runtime)
 
 on:
   push:
+    branches: [main]
     tags:
       - 'v*'
   workflow_dispatch:
@@ -17,12 +21,17 @@ on:
 permissions:
   contents: write
 
+# Never two releases racing: a newer push to the same ref cancels the run in flight.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-latest
     env:
-      # v1.7 for tag pushes, "dev" for a manual test run
-      VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}
+      # v1.7 for tag pushes, "latest" for main builds and manual runs
+      VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,31 +64,53 @@ jobs:
         shell: pwsh
         run: Get-ChildItem dist/*.zip | Select-Object Name, @{n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
 
-      - name: Create the GitHub release
-        if: github.ref_type == 'tag'
+      - name: Publish the release
+        if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
+          $tag = if ($env:REF_TYPE -eq 'tag') { $env:REF_NAME } else { 'latest' }
+          $sha = $env:GITHUB_SHA.Substring(0, 7)
+          $zips = Get-ChildItem dist/*.zip | ForEach-Object FullName
+
+          if ($tag -eq 'latest') {
+            $title = 'SadrApp — latest build'
+            $head = 'Newest build of main (' + $sha + '), published automatically on every push.'
+          } else {
+            $title = $tag
+            $head = 'Build ' + $tag + ' of SadrApp (Windows x64), commit ' + $sha + '.'
+          }
           $notes = @(
-            'Build ' + $env:VERSION + ' of SadrApp (Windows x64).'
+            $head
             ''
             '**SadrApp-Setup-' + $env:VERSION + '.zip** — full offline package: unzip and run `SadrSetup.exe` as administrator. The wizard installs the .NET 10 runtime and SQL Server 2022 LocalDB when they are missing, creates the database and adds a Start-Menu shortcut. Windows 10/11 x64. No default credentials — first launch asks for the main admin username/password.'
             ''
-            '**SadrApp-win-x64.zip** — application binaries only, for a machine that already has the .NET 10 Desktop Runtime and a SQL Server/LocalDB instance (put `Connection.dat` beside `SadrApp.exe`).'
+            '**SadrApp-win-x64.zip** — application binaries only, for a machine that already has the .NET 10 Desktop Runtime and a SQL Server/LocalDB instance (`Connection.dat` beside `SadrApp.exe`).'
           ) -join "`n"
 
-          gh release view $env:VERSION 2>$null | Out-Null
-          $zips = Get-ChildItem dist/*.zip | ForEach-Object FullName
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $env:VERSION $zips --clobber
+          if ($tag -eq 'latest') {
+            # Rolling release: drop the previous one and its tag, so the assets
+            # always belong to the commit that triggered this run.
+            gh release delete latest --yes --cleanup-tag 2>$null | Out-Null
+            gh release view latest 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) { throw "the previous 'latest' release could not be removed" }
+            gh release create latest $zips --title $title --notes $notes --target $env:GITHUB_SHA
           } else {
-            gh release create $env:VERSION $zips --title $env:VERSION --notes $notes --verify-tag
+            gh release view $tag 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+              gh release upload $tag $zips --clobber
+            } else {
+              gh release create $tag $zips --title $title --notes $notes --verify-tag
+            }
           }
           if ($LASTEXITCODE -ne 0) { throw 'release step failed' }
+          Write-Host "published: https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
 
-      - name: Upload the packages (manual test runs)
-        if: github.ref_type != 'tag'
+      - name: Upload the packages (manual runs)
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: SadrApp-packages
