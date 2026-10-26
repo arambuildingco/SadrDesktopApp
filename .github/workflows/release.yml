@@ -32,6 +32,11 @@ jobs:
     env:
       # v1.7 for tag pushes, "latest" for main builds and manual runs
       VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}
+      # The runner image also registers a machine-level "Microsoft Visual Studio
+      # Offline Packages" feed; restore dies on it in ~40 ms with no logged error,
+      # so every restore in this job (including build-installer.ps1's publishes)
+      # is pinned to nuget.org, where all of this project's packages live.
+      RestoreSources: https://api.nuget.org/v3/index.json
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,7 +87,7 @@ jobs:
         id: restore
         shell: pwsh
         run: |
-          $out = & dotnet restore SadrApp/SadrApp.csproj -r win-x64 --verbosity minimal 2>&1 | Out-String
+          $out = & dotnet restore SadrApp/SadrApp.csproj -r win-x64 --verbosity minimal --source https://api.nuget.org/v3/index.json 2>&1 | Out-String
           $code = $LASTEXITCODE
           $out | Write-Host
           $lines = @($out -split "`r?`n" | Where-Object { $_.Trim() -ne '' })
@@ -128,7 +133,7 @@ jobs:
       - name: Publish the app (win-x64, framework-dependent)
         shell: pwsh
         run: |
-          dotnet publish SadrApp/SadrApp.csproj -c Release -r win-x64 --self-contained false -o dist/app -p:PublishSingleFile=false
+          dotnet publish SadrApp/SadrApp.csproj -c Release -r win-x64 --self-contained false -o dist/app -p:PublishSingleFile=false --no-restore
           if ($LASTEXITCODE -ne 0) { throw 'SadrApp publish failed' }
 
       - name: Zip the app
