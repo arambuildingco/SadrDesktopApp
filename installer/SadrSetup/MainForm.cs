@@ -15,6 +15,9 @@ public class MainForm : Form
     private readonly Label _lblMode = new();
 
     private readonly GroupBox _grpDb = new();
+    // WinForms groups radio buttons by their immediate container: the auth radios must
+    // live in their own panel so they don't form a single group with the server radios.
+    private readonly Panel _pnlAuth = new();
     private readonly RadioButton _rbLocalDb = new();
     private readonly RadioButton _rbExisting = new();
     private readonly ComboBox _cmbServer = new();
@@ -79,26 +82,35 @@ public class MainForm : Form
         _btnRefresh.SetBounds(510, 52, 35, 26);
         _btnRefresh.Click += (_, _) => LoadServers();
 
+        // auth section lives in its own panel: separate RadioButton group (see field note)
+        _pnlAuth.SetBounds(15, 82, 530, 62);
+        _pnlAuth.BackColor = _grpDb.BackColor;
+
         _lblAuth.Text = "روش ورود:";
-        _lblAuth.Location = new Point(15, 86);
+        _lblAuth.Location = new Point(0, 4);
         _lblAuth.AutoSize = true;
         _rbAuthWin.Text = "احراز هویت ویندوز";
-        _rbAuthWin.SetBounds(105, 85, 170, 24);
+        _rbAuthWin.SetBounds(90, 3, 170, 24);
         _rbAuthWin.Checked = true;
         _rbAuthWin.CheckedChanged += (_, _) => AuthChanged();
         _rbAuthSql.Text = "نام کاربری و رمز عبور SQL Server";
-        _rbAuthSql.SetBounds(280, 85, 250, 24);
+        _rbAuthSql.SetBounds(265, 3, 250, 24);
         _rbAuthSql.CheckedChanged += (_, _) => AuthChanged();
 
         _lblUser.Text = "نام کاربری:";
-        _lblUser.Location = new Point(15, 117);
+        _lblUser.Location = new Point(0, 35);
         _lblUser.AutoSize = true;
-        _txtUser.SetBounds(105, 114, 170, 26);
+        _txtUser.SetBounds(90, 32, 170, 26);
         _lblPass.Text = "رمز عبور:";
-        _lblPass.Location = new Point(285, 117);
+        _lblPass.Location = new Point(270, 35);
         _lblPass.AutoSize = true;
-        _txtPass.SetBounds(360, 114, 175, 26);
+        _txtPass.SetBounds(345, 32, 175, 26);
         _txtPass.UseSystemPasswordChar = true;
+
+        _pnlAuth.Controls.AddRange(new Control[]
+        {
+            _lblAuth, _rbAuthWin, _rbAuthSql, _lblUser, _txtUser, _lblPass, _txtPass
+        });
 
         _btnConnect.Text = "اتصال و نمایش پایگاه‌ها";
         _btnConnect.SetBounds(15, 146, 220, 30);
@@ -117,8 +129,7 @@ public class MainForm : Form
         _grpDb.Controls.AddRange(new Control[]
         {
             _rbLocalDb, _rbExisting, _cmbServer, _btnRefresh,
-            _lblAuth, _rbAuthWin, _rbAuthSql,
-            _lblUser, _txtUser, _lblPass, _txtPass,
+            _pnlAuth,
             _btnConnect, lblDb, _cmbDb, _lblDbHint
         });
 
@@ -180,15 +191,11 @@ public class MainForm : Form
     {
         // auth options only apply to an existing server; LocalDB always uses Windows auth
         var existing = _rbExisting.Checked;
-        _rbAuthWin.Enabled = existing;
-        _rbAuthSql.Enabled = existing;
-        var sqlAuth = _rbAuthSql.Checked && existing;
-        _txtUser.Enabled = sqlAuth;
-        _txtPass.Enabled = sqlAuth;
-        _lblAuth.Enabled = existing;
-        _lblUser.Enabled = existing;
-        _lblPass.Enabled = existing;
-        _btnConnect.Enabled = existing;
+        _pnlAuth.Enabled = existing;
+        _txtUser.Enabled = _rbAuthSql.Checked;
+        _txtPass.Enabled = _rbAuthSql.Checked;
+        // connect/list-databases works against an existing server, or an already-installed LocalDB
+        _btnConnect.Enabled = existing || Steps.LocalDbInstalled();
     }
 
     private void LoadServers()
@@ -230,14 +237,16 @@ public class MainForm : Form
 
     private void ConnectAndListDatabases()
     {
-        var server = _cmbServer.Text.Trim();
+        // LocalDB mode: connect to the local instance with Windows auth
+        var localDb = _rbLocalDb.Checked;
+        var server = localDb ? @"(localdb)\" + Steps.LocalDbInstance : _cmbServer.Text.Trim();
         if (server.Length == 0)
         {
             MessageBox.Show("ابتدا یک سرور SQL انتخاب یا وارد کنید.", "سرور",
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        var winAuth = _rbAuthWin.Checked;
+        var winAuth = localDb || _rbAuthWin.Checked;
         var user = _txtUser.Text.Trim();
         var pass = _txtPass.Text;
         _btnConnect.Enabled = false;
