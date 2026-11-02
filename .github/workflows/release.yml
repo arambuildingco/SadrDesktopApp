@@ -1,11 +1,20 @@
 name: Release
 
-# Temporary diagnostic matrix: finds a Windows runner where `dotnet restore`
-# actually works. The build/publish steps return as soon as a working image is
-# identified (see the follow-up commit).
+# Builds the Windows app and publishes it to GitHub Releases.
 #
-# Every row reports its result in step names, which are readable on the public
-# run page without opening the (sign-in protected) log.
+#   push a v* tag   -> versioned release (v1.7, …), kept forever
+#   push to main    -> the rolling "latest" release is replaced, so its assets
+#                      always match the newest commit on main
+#   manual run      -> publishes "latest" too, and stores the zips as artifacts
+#
+# Release assets:
+#   SadrApp-Setup-<ver>.zip  full offline installer (SadrSetup.exe + app + redists)
+#   SadrApp-win-x64.zip      app binaries only (needs .NET 10 Desktop Runtime)
+#
+# runs-on is windows-2025 on purpose: on windows-latest `dotnet restore` fails
+# with a silent MSB4181 ("RestoreTask returned false but did not log an error")
+# for every project, including a freshly generated one, while the same SDK
+# (10.0.403) restores normally on windows-2025.
 
 on:
   push:
@@ -17,107 +26,127 @@ on:
 permissions:
   contents: write
 
+# Never two releases racing: a newer push to the same ref cancels the run in flight.
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  diagnose:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            label: latest
-            use_setup: 'true'
-          - os: windows-2022
-            label: '2022'
-            use_setup: 'true'
-          - os: windows-2025
-            label: '2025'
-            use_setup: 'true'
-          - os: windows-latest
-            label: latest-preinstalled
-            use_setup: 'false'
-    runs-on: ${{ matrix.os }}
+  build:
+    runs-on: windows-2025
     env:
+      # v1.7 for tag pushes, "latest" for main builds and manual runs
+      VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}
+      # Keep every restore (including build-installer.ps1's) on nuget.org, the
+      # only source this project needs.
       RestoreSources: https://api.nuget.org/v3/index.json
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up .NET 10 SDK
-        if: matrix.use_setup == 'true'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Probe SDK and machine NuGet config
+      # The SDK version lands in the step name, so it is visible on the public run
+      # page without opening the (sign-in protected) log.
+      - name: Probe the runner SDK
         id: sdk
         shell: pwsh
         run: |
-          function Clip([string]$s, [int]$max) {
-            $s = $s -replace '[^A-Za-z0-9 .,:/()_+=@-]', '?'
-            if ($s.Length -gt $max) { $s = $s.Substring(0, $max) }
-            if (-not $s) { $s = 'none' }
-            return $s
-          }
-          $sdks = @(dotnet --list-sdks 2>&1 | ForEach-Object { "$_" })
+          $sdks = @(dotnet --list-sdks)
           $v = if ($sdks.Count -gt 0) { ($sdks[-1] -split '\s+')[0] } else { 'NONE' }
           "v=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "installed SDKs: $sdks"
 
-          $cfg = @(
-            (Join-Path $env:APPDATA 'NuGet\NuGet.Config'),
-            'C:\Program Files\dotnet\sdk\NuGet.Config'
-          ) | Where-Object { Test-Path $_ }
-          $body = ($cfg | ForEach-Object { Get-Content $_ -Raw }) -join ' '
-          $body = ($body -split "`r?`n" | Where-Object { $_ -match '<' -and $_ -notmatch '^\s*<!--' }) -join ' '
-          "cfg=$(Clip $body 150)" >> $env:GITHUB_OUTPUT
-
-          $mb = (Get-ChildItem env: | Where-Object { $_.Name -match '(?i)^MSBUILD|^NUGET|^DOTNET_' } |
-            ForEach-Object { $_.Name }) -join ','
-          "envnames=$(Clip $mb 150)" >> $env:GITHUB_OUTPUT
-
-      - name: "${{ matrix.label }}: SDK ${{ steps.sdk.outputs.v }} | env ${{ steps.sdk.outputs.envnames }}"
+      - name: SDK on runner = ${{ steps.sdk.outputs.v }}
         shell: pwsh
-        run: Write-Host 'sdk probe'
+        run: dotnet --version
 
-      - name: "${{ matrix.label }}: NuGet config ${{ steps.sdk.outputs.cfg }}"
-        shell: pwsh
-        run: Write-Host 'config probe'
-
-      - name: Control restore of a fresh project
-        id: fresh
+      - name: Restore packages
         shell: pwsh
         run: |
-          $d = Join-Path $env:RUNNER_TEMP 'probe-restore'
-          & dotnet new classlib -o $d --force 2>&1 | Out-Null
-          $out = & dotnet restore $d 2>&1 | Out-String
-          $code = $LASTEXITCODE
-          $out | Write-Host
-          $last = @($out -split "`r?`n" | Where-Object { $_.Trim() -ne '' }) | Select-Object -Last 1
-          $last = "$last" -replace '[^A-Za-z0-9 .,:/()_+#=-]', '?'
-          if ($last.Length -gt 90) { $last = $last.Substring(0, 90) }
-          "r=$code | $last" >> $env:GITHUB_OUTPUT
-          exit 0
+          dotnet restore SadrApp/SadrApp.csproj -r win-x64 --verbosity minimal --source https://api.nuget.org/v3/index.json
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet restore failed' }
 
-      - name: "${{ matrix.label }}: fresh project restore -> ${{ steps.fresh.outputs.r }}"
-        shell: pwsh
-        run: Write-Host 'control restore'
-
-      - name: Restore SadrApp
-        id: app
+      - name: Publish the app (win-x64, framework-dependent)
         shell: pwsh
         run: |
-          $out = & dotnet restore SadrApp/SadrApp.csproj -r win-x64 --verbosity minimal --source https://api.nuget.org/v3/index.json 2>&1 | Out-String
-          $code = $LASTEXITCODE
-          $out | Write-Host
-          $last = @($out -split "`r?`n" | Where-Object { $_.Trim() -ne '' }) | Select-Object -Last 1
-          $last = "$last" -replace '[^A-Za-z0-9 .,:/()_+#=-]', '?'
-          if ($last.Length -gt 90) { $last = $last.Substring(0, 90) }
-          "r=$code | $last" >> $env:GITHUB_OUTPUT
-          exit 0
+          dotnet publish SadrApp/SadrApp.csproj -c Release -r win-x64 --self-contained false -o dist/app -p:PublishSingleFile=false --no-restore
+          if ($LASTEXITCODE -ne 0) { throw 'SadrApp publish failed' }
 
-      - name: "${{ matrix.label }}: SadrApp restore -> ${{ steps.app.outputs.r }}"
+      - name: Zip the app
         shell: pwsh
-        run: Write-Host 'app restore'
+        run: |
+          Compress-Archive -Path dist/app/* -DestinationPath dist/SadrApp-win-x64.zip -Force
+          Get-Item dist/SadrApp-win-x64.zip | Select-Object Name, Length | Format-List
+
+      # The full offline package the testers use: re-publishes the app, builds the
+      # net472 setup wizard and downloads the .NET runtime + LocalDB redists.
+      # Non-blocking on purpose: a download hiccup must never block the app package.
+      - name: Build the offline installer package
+        id: installer
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          & ./build-installer.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'build-installer.ps1 failed' }
+          Compress-Archive -Path dist/SadrApp-Setup -DestinationPath "dist/SadrApp-Setup-$env:VERSION.zip" -Force
+
+      - name: Show the packages
+        shell: pwsh
+        run: Get-ChildItem dist/*.zip | Select-Object Name, @{n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } } | Format-Table -AutoSize
+
+      - name: Publish the release
+        if: github.ref_type == 'tag' || github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $tag = if ($env:REF_TYPE -eq 'tag') { $env:REF_NAME } else { 'latest' }
+          $sha = $env:GITHUB_SHA.Substring(0, 7)
+          $zips = Get-ChildItem dist/*.zip | ForEach-Object FullName
+
+          if ($tag -eq 'latest') {
+            $title = 'SadrApp — latest build'
+            $head = 'Newest build of main (' + $sha + '), published automatically on every push.'
+          } else {
+            $title = $tag
+            $head = 'Build ' + $tag + ' of SadrApp (Windows x64), commit ' + $sha + '.'
+          }
+          $notes = @(
+            $head
+            ''
+            '**SadrApp-Setup-' + $env:VERSION + '.zip** — full offline package: unzip and run `SadrSetup.exe` as administrator. The wizard installs the .NET 10 runtime and SQL Server 2022 LocalDB when they are missing, creates the database and adds a Start-Menu shortcut. Windows 10/11 x64. No default credentials — first launch asks for the main admin username/password.'
+            ''
+            '**SadrApp-win-x64.zip** — application binaries only, for a machine that already has the .NET 10 Desktop Runtime and a SQL Server/LocalDB instance (`Connection.dat` beside `SadrApp.exe`).'
+          ) -join "`n"
+
+          if ($tag -eq 'latest') {
+            # Rolling release: drop the previous one and its tag, so the assets
+            # always belong to the commit that triggered this run.
+            gh release delete latest --yes --cleanup-tag 2>$null | Out-Null
+            gh release view latest 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) { throw "the previous 'latest' release could not be removed" }
+            gh release create latest $zips --title $title --notes $notes --target $env:GITHUB_SHA
+          } else {
+            gh release view $tag 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+              gh release upload $tag $zips --clobber
+            } else {
+              gh release create $tag $zips --title $title --notes $notes --verify-tag
+            }
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'release step failed' }
+          Write-Host "published: https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
+
+      - name: Upload the packages (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SadrApp-packages
+          path: dist/*.zip
+          if-no-files-found: error
