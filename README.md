@@ -7,7 +7,7 @@ WPF on .NET 10, SQL Server (LocalDB or full) via Entity Framework Core, QuestPDF
 ## Download (for testers)
 
 Grab the ready-to-run offline installer from the
-[**v1.6 release page**](https://github.com/skmodaresi/SadrApp/releases/download/v1.6/SadrApp-Setup-1.6.zip)
+[**v1.8 release page**](https://github.com/skmodaresi/SadrApp/releases/download/v1.8/SadrApp-Setup-1.8.zip)
 or browse all releases on the [Releases](https://github.com/skmodaresi/SadrApp/releases) page.
 
 The zip contains the full offline setup — .NET 10 runtime and SQL Server 2022 LocalDB installers
@@ -46,8 +46,16 @@ redist/SqlLocalDB-2022.msi               SQL Server 2022 LocalDB
 app/                                     application payload
 ```
 
-The wizard installs missing prerequisites silently, creates/starts the LocalDB instance,
-creates the database, writes `Connection.dat` beside the app, and adds a Start-Menu shortcut.
+The wizard installs missing prerequisites silently, then sets up the database:
+
+- **New install** — detects every installed SQL Server engine (registry discovery, LocalDB
+  included) and lets you pick one, log in with Windows or SQL Server authentication, then
+  choose an existing database from a list or type a name to create a new one. It creates the
+  database if needed, writes `Connection.dat` beside the app, and adds a Start-Menu shortcut.
+- **Update** — if an existing installation is found (registry marker, Start-Menu shortcut, or
+  Program Files), the wizard switches to update mode: it **keeps the existing `Connection.dat`**
+  untouched and copies only the files that actually changed.
+
 On first launch the app creates its schema and asks for the main admin username/password.
 
 To publish a new tester release, zip `dist/SadrApp-Setup/` and run:
