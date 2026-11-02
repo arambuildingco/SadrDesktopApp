@@ -33,9 +33,9 @@ jobs:
       # v1.7 for tag pushes, "latest" for main builds and manual runs
       VERSION: ${{ github.ref_type == 'tag' && github.ref_name || 'latest' }}
       # The runner image also registers a machine-level "Microsoft Visual Studio
-      # Offline Packages" feed; restore dies on it in ~40 ms with no logged error,
-      # so every restore in this job (including build-installer.ps1's publishes)
-      # is pinned to nuget.org, where all of this project's packages live.
+      # Offline Packages" feed; every restore in this job (including
+      # build-installer.ps1's publishes) is pinned to nuget.org, where all of
+      # this project's packages live.
       RestoreSources: https://api.nuget.org/v3/index.json
     steps:
       - name: Checkout
@@ -61,33 +61,79 @@ jobs:
         shell: pwsh
         run: dotnet --version
 
-      # Split out of the publish step: whichever of these turns red tells us whether
-      # the failure is NuGet restore, compile/publish, or just zipping the output.
-      # Restore fails silently (MSB4181 "returned false but did not log an error"), so
-      # the configured sources and the interesting output lines are copied into the
-      # following step names: step names are readable on the public run page, while
-      # log text needs a signed-in session. Values are stripped to a YAML-safe charset.
-      - name: List NuGet sources
-        id: srcs
+      # A broken proxy or NuGet override on the machine would kill restore before it
+      # touches any source, so the relevant variables go into a step name too.
+      - name: Probe proxy and NuGet env
+        id: env
         shell: pwsh
         run: |
-          $out = & dotnet nuget list source 2>&1 | Out-String
-          $out | Write-Host
-          $names = @($out -split "`r?`n" | Where-Object { $_ -match '^\s*\d+\.\s+' } |
-            ForEach-Object { ($_ -replace '^\s*\d+\.\s+', '').Trim() })
-          $list = ($names -join ' | ') -replace '[^A-Za-z0-9 .,:/()_+=@-]', '?'
-          if ($list.Length -gt 150) { $list = $list.Substring(0, 150) }
-          "list=$list" >> $env:GITHUB_OUTPUT
+          function Clip([string]$s, [int]$max) {
+            $s = $s -replace '[^A-Za-z0-9 .,:/()_+=@-]', '?'
+            if ($s.Length -gt $max) { $s = $s.Substring(0, $max) }
+            if (-not $s) { $s = 'none' }
+            return $s
+          }
+          $proxy = (Get-ChildItem env: | Where-Object { $_.Name -match '(?i)proxy' } |
+            ForEach-Object { $_.Name + '=' + $_.Value }) -join '; '
+          $nuget = (Get-ChildItem env: | Where-Object { $_.Name -match '(?i)^nuget' } |
+            ForEach-Object { $_.Name + '=' + $_.Value }) -join '; '
+          "proxy=$(Clip $proxy 130)" >> $env:GITHUB_OUTPUT
+          "nuget=$(Clip $nuget 130)" >> $env:GITHUB_OUTPUT
 
-      - name: "NuGet sources: ${{ steps.srcs.outputs.list }}"
+      - name: "Proxy env: ${{ steps.env.outputs.proxy }}"
         shell: pwsh
-        run: Write-Host 'sources listed above'
+        run: Write-Host 'env probe'
 
+      - name: "NuGet env: ${{ steps.env.outputs.nuget }}"
+        shell: pwsh
+        run: Write-Host 'env probe'
+
+      # Control: does restore work at all on this runner, for a project with no
+      # references and no runtime identifier?
+      - name: Control restore of a fresh project
+        id: fresh
+        shell: pwsh
+        run: |
+          $d = Join-Path $env:RUNNER_TEMP 'probe-restore'
+          & dotnet new classlib -o $d --force 2>&1 | Out-Null
+          $out = & dotnet restore $d 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          $out | Write-Host
+          $last = @($out -split "`r?`n" | Where-Object { $_.Trim() -ne '' }) | Select-Object -Last 1
+          $last = "$last" -replace '[^A-Za-z0-9 .,:/()_+#=-]', '?'
+          if ($last.Length -gt 100) { $last = $last.Substring(0, 100) }
+          "r=$code | $last" >> $env:GITHUB_OUTPUT
+          exit 0
+
+      - name: "Fresh project restore: ${{ steps.fresh.outputs.r }}"
+        shell: pwsh
+        run: Write-Host 'control restore'
+
+      # Control: same project, but without the win-x64 runtime identifier.
+      - name: Control restore without a runtime identifier
+        id: norid
+        shell: pwsh
+        run: |
+          $out = & dotnet restore SadrApp/SadrApp.csproj --verbosity minimal --source https://api.nuget.org/v3/index.json 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          $out | Write-Host
+          $last = @($out -split "`r?`n" | Where-Object { $_.Trim() -ne '' }) | Select-Object -Last 1
+          $last = "$last" -replace '[^A-Za-z0-9 .,:/()_+#=-]', '?'
+          if ($last.Length -gt 100) { $last = $last.Substring(0, 100) }
+          "r=$code | $last" >> $env:GITHUB_OUTPUT
+          exit 0
+
+      - name: "Restore without RID: ${{ steps.norid.outputs.r }}"
+        shell: pwsh
+        run: Write-Host 'control restore'
+
+      # The real restore, at detailed verbosity so the cause of the known silent
+      # MSB4181 failure ("returned false but did not log an error") is printed.
       - name: Restore packages
         id: restore
         shell: pwsh
         run: |
-          $out = & dotnet restore SadrApp/SadrApp.csproj -r win-x64 --verbosity minimal --source https://api.nuget.org/v3/index.json 2>&1 | Out-String
+          $out = & dotnet restore SadrApp/SadrApp.csproj -r win-x64 --verbosity detailed --source https://api.nuget.org/v3/index.json 2>&1 | Out-String
           $code = $LASTEXITCODE
           $out | Write-Host
           $lines = @($out -split "`r?`n" | Where-Object { $_.Trim() -ne '' })
@@ -98,34 +144,22 @@ jobs:
             if (-not $s) { $s = 'none' }
             return $s
           }
-          $net  = $lines | Where-Object { $_ -match '(?i)(status code|429|431|401|403|forbidden|denied|unable|timeout|timed out|socket|connection|quota)' } | Select-Object -First 1
-          $codeLine = $lines | Where-Object { $_ -match '(?i)\b(error|exception)\b' -and $_ -notmatch 'MSB4181' } | Select-Object -First 1
-          $o = $lines | Select-Object -First 1
-          $t = $lines | Select-Object -Last 1
-          $t2 = $lines | Select-Object -Last 2 | Select-Object -First 1
-          "first=$(Clip $o)" >> $env:GITHUB_OUTPUT
-          "net=$(Clip $net)" >> $env:GITHUB_OUTPUT
-          "codeline=$(Clip $codeLine)" >> $env:GITHUB_OUTPUT
-          "tail=$(Clip $t)" >> $env:GITHUB_OUTPUT
-          "tail2=$(Clip $t2)" >> $env:GITHUB_OUTPUT
+          $fi = $null
+          for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match 'Failed to restore') { $fi = $i; break } }
+          $pre = if ($null -ne $fi -and $fi -gt 0) { $lines[$fi - 1] } else { 'n/a' }
+          $odd = $lines | Where-Object {
+            $_ -match '(?i)(plugin|exception|access|denied|invalid|not found|does not exist|unauthorized|quota|429|NU[0-9]{4})' -and $_ -notmatch 'MSB4181'
+          } | Select-Object -First 1
+          "pre=$(Clip $pre)" >> $env:GITHUB_OUTPUT
+          "odd=$(Clip $odd)" >> $env:GITHUB_OUTPUT
           if ($code -ne 0) { exit $code }
 
-      - name: "Restore error line: ${{ steps.restore.outputs.codeline }}"
+      - name: "Restore line before failure: ${{ steps.restore.outputs.pre }}"
         if: always() && steps.restore.outcome == 'failure'
         shell: pwsh
         run: Write-Host 'see restore'
 
-      - name: "Restore network line: ${{ steps.restore.outputs.net }}"
-        if: always() && steps.restore.outcome == 'failure'
-        shell: pwsh
-        run: Write-Host 'see restore'
-
-      - name: "Restore first line: ${{ steps.restore.outputs.first }}"
-        if: always() && steps.restore.outcome == 'failure'
-        shell: pwsh
-        run: Write-Host 'see restore'
-
-      - name: "Restore last 2 lines: ${{ steps.restore.outputs.tail2 }} // ${{ steps.restore.outputs.tail }}"
+      - name: "Restore suspicious line: ${{ steps.restore.outputs.odd }}"
         if: always() && steps.restore.outcome == 'failure'
         shell: pwsh
         run: Write-Host 'see restore'
