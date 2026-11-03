@@ -87,6 +87,21 @@ app falls back to the default LocalDB instance (`(localdb)\MSSQLLocalDB`).
 | `installer/SadrSetup/` | Setup wizard (WinForms on .NET Framework 4.7.2, runs before any runtime install) |
 | `build-installer.ps1` | Produces the offline `dist/` package |
 | `ui-*.ps1` | UIAutomation smoke tests |
+| `SadrWeb/` | Web version: ASP.NET Core REST API + React SPA over the same data model |
+
+## Web version (SadrWeb)
+
+The same system as a browser application, with a REST API that any mobile or desktop client can
+connect to. See [`SadrWeb/README.md`](SadrWeb/README.md) for the architecture and
+[`SadrWeb/docs/RUN.md`](SadrWeb/docs/RUN.md) for step-by-step instructions.
+
+```bash
+cd SadrWeb && ./build.sh             # Windows: .\build.ps1
+cd api && dotnet run -c Release --urls http://0.0.0.0:5199
+```
+
+Then open <http://localhost:5199> and sign in as `admin` (the generated password is in
+`SadrWeb/api/bin/Release/net10.0/App_Data/admin-password.txt`).
 
 ## License
 

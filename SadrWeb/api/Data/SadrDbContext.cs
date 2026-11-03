@@ -1,0 +1,280 @@
+using Microsoft.EntityFrameworkCore;
+using SadrWeb.Api.Infrastructure;
+
+namespace SadrWeb.Api.Data;
+
+/// <summary>
+/// The web application's DbContext. It maps exactly the same tables and columns as the
+/// desktop app (SadrApp), so an existing SQL Server database can be pointed at with
+/// Database:Provider=SqlServer and used by both applications at the same time.
+/// </summary>
+public class SadrDbContext : DbContext
+{
+    private readonly Guid? _currentUserId;
+
+    public SadrDbContext(DbContextOptions<SadrDbContext> options, IHttpContextAccessor? http = null)
+        : base(options)
+    {
+        _currentUserId = UserSession.Resolve(http);
+    }
+
+    public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+    public DbSet<ProductExtraCategory> ProductExtraCategories => Set<ProductExtraCategory>();
+    public DbSet<UploadedFile> UploadedFiles => Set<UploadedFile>();
+    public DbSet<ProductFile> ProductFiles => Set<ProductFile>();
+    public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProjectCategory> ProjectCategories => Set<ProjectCategory>();
+    public DbSet<Project> Projects => Set<Project>();
+    public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
+    public DbSet<TaskReport> TaskReports => Set<TaskReport>();
+    public DbSet<Person> People => Set<Person>();
+    public DbSet<Company> Companies => Set<Company>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<Brand> Brands => Set<Brand>();
+    public DbSet<Unit> Units => Set<Unit>();
+    public DbSet<Currency> Currencies => Set<Currency>();
+    public DbSet<Bank> Banks => Set<Bank>();
+    public DbSet<BankBranch> BankBranches => Set<BankBranch>();
+    public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
+    public DbSet<WareHouse> WareHouses => Set<WareHouse>();
+    public DbSet<WarehouseTransfer> WarehouseTransfers => Set<WarehouseTransfer>();
+    public DbSet<AttributeDef> Attributes => Set<AttributeDef>();
+    public DbSet<CategoryAttribute> CategoryAttributes => Set<CategoryAttribute>();
+    public DbSet<ProductAttrib> ProductAttribs => Set<ProductAttrib>();
+    public DbSet<AccountGroup> AccountGroups => Set<AccountGroup>();
+    public DbSet<GeneralAccount> GeneralAccounts => Set<GeneralAccount>();
+    public DbSet<SubSidiaryAccount> SubSidiaryAccounts => Set<SubSidiaryAccount>();
+    public DbSet<DetailAccount> DetailAccounts => Set<DetailAccount>();
+    public DbSet<CustomersProvider> CustomersProviders => Set<CustomersProvider>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceDetail> InvoiceDetails => Set<InvoiceDetail>();
+    public DbSet<Price> Prices => Set<Price>();
+    public DbSet<InvoicePrintSetting> InvoicePrintSettings => Set<InvoicePrintSetting>();
+    public DbSet<Cheque> Cheques => Set<Cheque>();
+    public DbSet<BankTransaction> BankTransactions => Set<BankTransaction>();
+    public DbSet<Cash> Cashes => Set<Cash>();
+    public DbSet<AccountTransaction> AccountTransactions => Set<AccountTransaction>();
+    public DbSet<TaskReportMoneyTransaction> TaskReportMoneyTransactions => Set<TaskReportMoneyTransaction>();
+    public DbSet<InvoiceMoneyTransaction> InvoiceMoneyTransactions => Set<InvoiceMoneyTransaction>();
+
+    protected override void OnModelCreating(ModelBuilder mb)
+    {
+        // Self-referencing hierarchies: no cascade delete.
+        mb.Entity<ProductCategory>().HasOne(c => c.Parent)
+          .WithMany(c => c.Children).HasForeignKey(c => c.ParentId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<ProjectCategory>().HasOne(c => c.Parent)
+          .WithMany(c => c.Children).HasForeignKey(c => c.ParentId).OnDelete(DeleteBehavior.NoAction);
+
+        mb.Entity<Product>().HasOne(p => p.MainCategory)
+          .WithMany().HasForeignKey(p => p.MainCategoryId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Product>().HasOne(p => p.MainUnit)
+          .WithMany().HasForeignKey(p => p.MainUnitId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Product>().HasOne(p => p.Brand)
+          .WithMany().HasForeignKey(p => p.BrandId).OnDelete(DeleteBehavior.NoAction);
+
+        mb.Entity<ProductExtraCategory>().HasOne(e => e.Product)
+          .WithMany(p => p.ExtraCategories).HasForeignKey(e => e.ProductId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<ProductExtraCategory>().HasOne(e => e.Category)
+          .WithMany().HasForeignKey(e => e.CategoryId).OnDelete(DeleteBehavior.NoAction);
+
+        // Stored files: a product image is a ProductFiles row pointing at an UploadedFiles row.
+        mb.Entity<ProductFile>().HasOne(f => f.Product)
+          .WithMany().HasForeignKey(f => f.ProductId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<ProductFile>().HasOne(f => f.UploadedFile)
+          .WithMany().HasForeignKey(f => f.UploadedFileId).OnDelete(DeleteBehavior.NoAction);
+
+        mb.Entity<Project>().HasOne(p => p.Category)
+          .WithMany().HasForeignKey(p => p.CategoryId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Project>().HasOne(p => p.Currency)
+          .WithMany().HasForeignKey(p => p.CurrencyId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Project>().HasOne(p => p.ParentProject)
+          .WithMany().HasForeignKey(p => p.ParentProjectId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Project>().HasOne(p => p.CreatorPerson)
+          .WithMany().HasForeignKey(p => p.CreatorPersonId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Project>().HasOne(p => p.ManagerPerson)
+          .WithMany().HasForeignKey(p => p.ProjectManagerPersonId).OnDelete(DeleteBehavior.NoAction);
+
+        mb.Entity<Person>().HasOne(p => p.LoginUser)
+          .WithMany().HasForeignKey(p => p.LoginUserId).OnDelete(DeleteBehavior.NoAction);
+
+        mb.Entity<Company>().HasOne(c => c.Manager)
+          .WithMany().HasForeignKey(c => c.ManagerId).OnDelete(DeleteBehavior.NoAction);
+
+        mb.Entity<BankBranch>().HasOne(b => b.Bank)
+          .WithMany(bank => bank.Branches).HasForeignKey(b => b.BankId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<BankBranch>().HasOne(b => b.Manager)
+          .WithMany().HasForeignKey(b => b.ManagerPersonId).OnDelete(DeleteBehavior.NoAction);
+
+        mb.Entity<BankAccount>().HasOne(a => a.Branch)
+          .WithMany().HasForeignKey(a => a.BankBranchId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<BankAccount>().HasOne(a => a.Person)
+          .WithMany().HasForeignKey(a => a.PersonId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<BankAccount>().HasOne(a => a.Company)
+          .WithMany().HasForeignKey(a => a.CompanyId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<BankAccount>().HasOne(a => a.Currency)
+          .WithMany().HasForeignKey(a => a.CurrencyId).OnDelete(DeleteBehavior.NoAction);
+
+        mb.Entity<BankTransaction>().HasOne(t => t.BankAccount)
+          .WithMany().HasForeignKey(t => t.BankAccountId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<BankTransaction>().HasOne(t => t.Cheque)
+          .WithMany().HasForeignKey(t => t.ChequeId).OnDelete(DeleteBehavior.NoAction);
+
+        mb.Entity<Cheque>().HasOne(c => c.Invoice)
+          .WithMany().HasForeignKey(c => c.InvoiceId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Cheque>().HasOne(c => c.Person)
+          .WithMany().HasForeignKey(c => c.PersonId).OnDelete(DeleteBehavior.NoAction);
+
+        mb.Entity<Unit>().HasOne(u => u.ParentUnit)
+          .WithMany().HasForeignKey(u => u.ParentUnitId).OnDelete(DeleteBehavior.NoAction);
+
+        // Product attributes
+        mb.Entity<CategoryAttribute>().HasOne(a => a.Category)
+          .WithMany().HasForeignKey(a => a.CategoryId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<CategoryAttribute>().HasOne(a => a.Attribute)
+          .WithMany().HasForeignKey(a => a.AttributeId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<ProductAttrib>().HasOne(a => a.Product)
+          .WithMany(p => p.Attribs).HasForeignKey(a => a.ProductId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<ProductAttrib>().HasOne(a => a.Attribute)
+          .WithMany().HasForeignKey(a => a.AttribId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<ProductAttrib>().HasOne(a => a.CategoryAttribute)
+          .WithMany().HasForeignKey(a => a.CategoryAttribId).OnDelete(DeleteBehavior.NoAction);
+
+        // Accounting chain
+        mb.Entity<GeneralAccount>().HasOne(g => g.Group)
+          .WithMany().HasForeignKey(g => g.AccountGroupId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<SubSidiaryAccount>().HasOne(s => s.General)
+          .WithMany().HasForeignKey(s => s.GeneralAccountId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<DetailAccount>().HasOne(d => d.SubSidiary)
+          .WithMany().HasForeignKey(d => d.SubSidiaryAccountId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<DetailAccount>().HasOne(d => d.CustomerProvider)
+          .WithMany().HasForeignKey(d => d.CustomerProviderId).OnDelete(DeleteBehavior.NoAction);
+
+        // Invoices
+        mb.Entity<Invoice>().HasOne(i => i.Customer)
+          .WithMany().HasForeignKey(i => i.CustomerId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Invoice>().HasOne(i => i.Provider)
+          .WithMany().HasForeignKey(i => i.ProviderId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<InvoiceDetail>().HasOne(d => d.Invoice)
+          .WithMany(i => i.Details).HasForeignKey(d => d.InvoiceId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<InvoiceDetail>().HasOne(d => d.Product)
+          .WithMany().HasForeignKey(d => d.ProductId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<InvoiceDetail>().HasOne(d => d.Price)
+          .WithMany().HasForeignKey(d => d.PriceId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<InvoiceDetail>().HasOne(d => d.Currency)
+          .WithMany().HasForeignKey(d => d.CurrencyId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<InvoiceDetail>().HasOne(d => d.Unit)
+          .WithMany().HasForeignKey(d => d.UnitId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Price>().HasOne(p => p.Product)
+          .WithMany().HasForeignKey(p => p.ProductId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Price>().HasOne(p => p.Unit)
+          .WithMany().HasForeignKey(p => p.UnitId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Price>().HasOne(p => p.Currency)
+          .WithMany().HasForeignKey(p => p.CurrencyId).OnDelete(DeleteBehavior.NoAction);
+
+        mb.Entity<CustomersProvider>().HasOne(c => c.Person)
+          .WithMany().HasForeignKey(c => c.PersonId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<CustomersProvider>().HasOne(c => c.Company)
+          .WithMany().HasForeignKey(c => c.CompanyId).OnDelete(DeleteBehavior.NoAction);
+
+        // Project tasks
+        mb.Entity<ProjectTask>().HasOne(t => t.Project)
+          .WithMany(p => p.Tasks).HasForeignKey(t => t.ProjectId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<ProjectTask>().HasOne(t => t.ResponcePerson)
+          .WithMany().HasForeignKey(t => t.ResponcePersonId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<TaskReport>().HasOne(r => r.Task)
+          .WithMany(t => t.Reports).HasForeignKey(r => r.TaskId).OnDelete(DeleteBehavior.NoAction);
+
+        // Money movements: cash boxes, account transactions, invoice/report links
+        mb.Entity<Cash>().HasOne(c => c.OwnerPerson)
+          .WithMany().HasForeignKey(c => c.OwnerPersonId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Cash>().HasOne(c => c.OwnerCompany)
+          .WithMany().HasForeignKey(c => c.OwnerCompanyId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<Cash>().HasOne(c => c.ResponcePerson)
+          .WithMany().HasForeignKey(c => c.ResponcePersonId).OnDelete(DeleteBehavior.NoAction);
+        // BankAccountId/CashId are optional on purpose: a transaction lives in either a
+        // bank account or a cash box, never both.
+        mb.Entity<AccountTransaction>().HasOne(t => t.BankAccount)
+          .WithMany().HasForeignKey(t => t.BankAccountId)
+          .IsRequired(false).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<AccountTransaction>().HasOne(t => t.Cash)
+          .WithMany().HasForeignKey(t => t.CashId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<AccountTransaction>().HasOne(t => t.Invoice)
+          .WithMany().HasForeignKey(t => t.InvoiceId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<AccountTransaction>().HasOne(t => t.Person)
+          .WithMany().HasForeignKey(t => t.PersonId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<TaskReportMoneyTransaction>().HasOne(l => l.TaskReport)
+          .WithMany().HasForeignKey(l => l.TaskReportId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<TaskReportMoneyTransaction>().HasOne(l => l.AccountTransaction)
+          .WithMany().HasForeignKey(l => l.AccountTransactionId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<InvoiceMoneyTransaction>().HasOne(l => l.Invoice)
+          .WithMany().HasForeignKey(l => l.InvoiceId).OnDelete(DeleteBehavior.NoAction);
+        mb.Entity<InvoiceMoneyTransaction>().HasOne(l => l.AccountTransaction)
+          .WithMany().HasForeignKey(l => l.AccountTransactionId).OnDelete(DeleteBehavior.NoAction);
+
+        // Unique codes: the desktop database enforces these with filtered indexes, whose
+        // syntax differs per provider. They stay as plain (non-unique) indexes here and the
+        // API validates codes per table instead — see CodeGuard.
+        mb.Entity<Person>().HasIndex(p => p.Code);
+        mb.Entity<Company>().HasIndex(c => c.Code);
+        mb.Entity<Product>().HasIndex(p => p.Code);
+        mb.Entity<Brand>().HasIndex(b => b.Code);
+        mb.Entity<Bank>().HasIndex(b => b.Code);
+        mb.Entity<Currency>().HasIndex(c => c.Code);
+        mb.Entity<WareHouse>().HasIndex(w => w.Code);
+        mb.Entity<CustomersProvider>().HasIndex(c => c.Code);
+        mb.Entity<AccountGroup>().HasIndex(g => g.Code);
+        mb.Entity<GeneralAccount>().HasIndex(g => g.Code);
+        mb.Entity<SubSidiaryAccount>().HasIndex(s => s.Code);
+        mb.Entity<DetailAccount>().HasIndex(d => d.Code);
+        mb.Entity<Cash>().HasIndex(c => c.Code);
+        mb.Entity<Invoice>().HasIndex(i => i.InvoiceNumber);
+        mb.Entity<User>().HasIndex(u => u.Username).IsUnique();
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        StampAudit();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        StampAudit();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>
+    /// Fills RecordUniqueId / Create/UpdateDateTime / Create/UpdateUserId automatically,
+    /// exactly like the desktop application does.
+    /// </summary>
+    private void StampAudit()
+    {
+        var now = DateTime.Now;
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified)) continue;
+            if (entry.Metadata.FindProperty("CreateDateTime") is null) continue;
+
+            if (entry.State == EntityState.Added)
+            {
+                if (entry.Metadata.FindProperty("RecordUniqueId") is not null &&
+                    entry.Property("RecordUniqueId").CurrentValue is Guid g && g == Guid.Empty)
+                    entry.Property("RecordUniqueId").CurrentValue = Guid.NewGuid();
+
+                if (entry.Property("CreateDateTime").CurrentValue is null)
+                    entry.Property("CreateDateTime").CurrentValue = now;
+
+                if (entry.Metadata.FindProperty("CreateUserId") is not null &&
+                    entry.Property("CreateUserId").CurrentValue is null)
+                    entry.Property("CreateUserId").CurrentValue = _currentUserId;
+            }
+
+            if (entry.Metadata.FindProperty("UpdateDateTime") is not null)
+                entry.Property("UpdateDateTime").CurrentValue = now;
+
+            if (entry.Metadata.FindProperty("UpdateUserId") is not null)
+                entry.Property("UpdateUserId").CurrentValue = _currentUserId;
+        }
+    }
+}

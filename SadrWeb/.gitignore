@@ -1,0 +1,11 @@
+# build output
+api/bin/
+api/obj/
+api/App_Data/
+web/node_modules/
+web/dist/
+
+# the built SPA is committed into api/wwwroot on purpose so `dotnet run` serves it;
+# refresh it with ./build.sh
+web/tsconfig.tsbuildinfo
+web/*.tsbuildinfo
